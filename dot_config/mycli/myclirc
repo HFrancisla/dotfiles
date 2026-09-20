@@ -1,0 +1,141 @@
+# vi: ft=dosini
+# ==========================================
+# mycli 配置文件
+# 路径: $XDG_CONFIG_HOME/mycli/myclirc (mycli 原生支持 XDG)
+# 对照: dot_config/pgcli/config
+# ==========================================
+
+[main]
+
+# --- 1. 智能补全 (对应 pgcli smart_completion / auto_suggest) ---
+smart_completion = True
+# 触发补全的最少字符数 (pgcli 无此选项，mycli 默认 1 即可)
+min_completion_trigger = 1
+wider_completion_menu = False
+
+# 补全元数据预取策略
+# always = 启动后后台预取所有 schema
+prefetch_schemas_mode = always
+
+# --- 2. 多行输入 (对应 pgcli multi_line = True) ---
+multi_line = True
+
+# --- 3. 破坏性操作保护 (对应 pgcli destructive_warning) ---
+destructive_warning = True
+destructive_keywords = DROP SHUTDOWN DELETE TRUNCATE ALTER UPDATE
+
+# --- 4. 输出格式 (对应 pgcli §4) ---
+# pgcli: timing = True
+timing = True
+
+# pgcli: null_string = '⟨NULL⟩'
+null_string = ⟨NULL⟩
+
+# pgcli: table_format = psql → mycli 中用 psql_unicode 以匹配 unicode 边框
+table_format = psql_unicode
+
+# 重定向输出格式
+redirect_format = csv
+
+# pgcli: auto_expand = True → mycli: auto_vertical_output = True
+# 当结果集宽度超过终端时自动切换纵向展示
+auto_vertical_output = True
+
+# 数字对齐
+numeric_alignment = right
+
+# 二进制值显示方式: hex 或 utf8
+binary_display = hex
+
+# pgcli: pager = pspg --no-mouse --pgcli-fix
+# mycli 需要配合 table_format = psql_unicode 使用 pspg
+pager = pspg --no-mouse
+enable_pager = True
+
+# --- 5. 提示符 (对应 pgcli §5) ---
+# pgcli: \u@\H:\d\T\# → mycli 近似格式
+# mycli 提示符变量:
+#   \t = 数据库类型(MySQL/MariaDB/Percona/TiDB)
+#   \u = 用户名
+#   \h = 主机名
+#   \d = 当前数据库
+# 格式: "类型 用户@主机:数据库> "
+prompt = '\t \u@\h:\d> '
+prompt_continuation = '-> '
+
+# --- 6. 历史记录 (对应 pgcli §6) ---
+# pgcli 支持 history_file = default 魔法值，mycli 不支持
+# mycli 默认: ~/.mycli-history (可通过 MYCLI_HISTFILE 环境变量覆盖)
+history_file = ~/.mycli-history
+
+# --- 7. 行为 (对应 pgcli §7) ---
+# pgcli: keyword_casing = upper
+keyword_casing = upper
+
+# pgcli: verbose_errors = True → mycli: show_warnings
+# 执行后自动显示 SHOW WARNINGS 结果
+show_warnings = True
+
+# pgcli: less_chatty = False → 显示启动/退出信息
+less_chatty = False
+
+# 运行收藏查询时显示完整 SQL
+show_favorite_query = True
+
+# 长查询完成后蜂鸣 (0=禁用)
+beep_after_seconds = 0
+
+# --- 8. 其余 mycli 默认值 ---
+# pgcli: syntax_style = native
+syntax_style = native
+
+# pgcli: vi = False → mycli: key_bindings = emacs
+key_bindings = emacs
+
+# pgcli: log_level = INFO
+# pgcli 支持 log_file = default 魔法值，mycli 不支持
+log_file = ~/.mycli.log
+log_level = INFO
+
+# --- 9. 颜色方案 (对应 pgcli §9，使用 prompt-toolkit 2.0 样式名) ---
+# mycli 使用 prompt-toolkit 2.0 的 class-based style name
+# 映射参考 mycli 源码 clistyle.py 中的 TOKEN_TO_PROMPT_STYLE
+[colors]
+completion-menu.completion.current = 'bg:#ffffff #000000'
+completion-menu.completion = 'bg:#008888 #ffffff'
+completion-menu.meta.completion.current = 'bg:#44aaaa #000000'
+completion-menu.meta.completion = 'bg:#448888 #ffffff'
+completion-menu.multi-column-meta = 'bg:#aaffff #000000'
+scrollbar.arrow = 'bg:#003333'
+scrollbar = 'bg:#00aaaa'
+selected = '#ffffff bg:#6666aa'
+search = '#ffffff bg:#4444aa'
+search.current = '#ffffff bg:#44aa44'
+bottom-toolbar = 'bg:#3a3a5c #c0c0d0'
+bottom-toolbar.off = 'bg:#3a3a5c #7c7c9c'
+bottom-toolbar.on = 'bg:#3a3a5c #b2e0df bold'
+search-toolbar = 'noinherit bold'
+search-toolbar.text = 'nobold'
+system-toolbar = 'noinherit bold'
+arg-toolbar = 'noinherit bold'
+arg-toolbar.text = 'nobold'
+output.header = '#00ff5f bold'
+output.odd-row = ''
+output.even-row = ''
+output.null = '#808080'
+
+# Prompt 颜色 (与 pgcli / starship 的紫色一致: #c678dd)
+prompt = '#c678dd'
+
+# --- 10. 收藏查询 (对应 pgcli §10 named queries) ---
+# pgcli: \n show_tables 执行
+# mycli: \f show_tables 执行  (\fs 保存新查询, \fd 删除)
+[favorite_queries]
+show_tables = """SELECT table_schema AS tbl_schema, table_name AS tbl_name, CONCAT(ROUND(((data_length + index_length) / 1024 / 1024), 2), ' MB') AS size FROM information_schema.TABLES WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys') ORDER BY (data_length + index_length) DESC;"""
+show_connections = """SELECT user, host, db, command, time, state, LEFT(info, 80) AS query FROM information_schema.PROCESSLIST ORDER BY time DESC;"""
+show_locks = """SELECT r.trx_id AS waiting_trx_id, r.trx_mysql_thread_id AS waiting_pid, r.trx_query AS waiting_query, b.trx_id AS blocking_trx_id, b.trx_mysql_thread_id AS blocking_pid, b.trx_query AS blocking_query FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_TRX b ON b.trx_id = w.blocking_trx_id JOIN information_schema.INNODB_TRX r ON r.trx_id = w.requesting_trx_id;"""
+
+# --- 11. DSN 别名 (对应 pgcli §11, 按需添加) ---
+[alias_dsn]
+# local = mysql://hzf@localhost/mydb
+# staging = mysql://readonly@staging.example.com/app

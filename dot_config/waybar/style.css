@@ -1,0 +1,174 @@
+/* =========================================================
+ * Waybar CSS for Arch Linux / Hyprland (Laptop Optimized)
+ * ========================================================= */
+
+* {
+    /* 强制使用 Nerd Fonts 以确保图标正常渲染 */
+    font-family: "JetBrainsMono Nerd Font", "Font Awesome 6 Free", sans-serif;
+    font-size: 9px;
+    font-weight: bold;
+	min-height : 0;
+}
+
+window#waybar {
+    /* 半透明背景，配合 Hyprland 的 blur 效果极佳 */
+    background-color: rgba(30, 30, 46, 0.7);
+    color: #cdd6f4;
+    transition-property: background-color;
+    transition-duration: .5s;
+}
+
+/* 隐藏不可见的空模块，避免多余的 margin */
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+/* --- 模块组基础样式 --- */
+.modules-left,
+.modules-center,
+.modules-right {
+    margin: 1px 3px;
+}
+
+/* --- 左侧模块：工作区 --- */
+#workspaces {
+    background-color: #313244;
+    border-radius: 15px;
+    padding: 0 5px;
+}
+
+#workspaces button {
+    padding: 0 8px;
+    color: #a6adc8;
+    border-radius: 15px;
+    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.68);
+}
+
+#workspaces button:hover {
+    background: #45475a;
+    color: #cdd6f4;
+}
+
+#workspaces button.active {
+    background-color: #89b4fa; /* 激活状态高亮蓝 */
+    color: #1e1e2e;
+    min-width: 40px; /* 让激活的工作区按钮变长一点，增加视觉辨识度 */
+}
+
+#workspaces button.urgent {
+    background-color: #f38ba8; /* 紧急通知高亮红 */
+    color: #1e1e2e;
+}
+
+#window {
+    margin-left: 10px;
+    color: #b4befe;
+}
+
+/* --- 中间模块：时间 --- */
+#clock {
+    background-color: #313244;
+    color: #cba6f7;
+    border-radius: 15px;
+    padding: 0 15px;
+}
+
+/* --- 右侧模块：药丸式设计 --- */
+#idle_inhibitor,
+#cpu,
+#custom-gpu,
+#pulseaudio,
+#network,
+#backlight,
+#battery,
+#tray {
+    background-color: #313244;
+    color: #cdd6f4;
+    border-radius: 15px;
+    padding: 0 12px;
+    margin-left: 6px;
+}
+
+/* --- 右侧各模块特定颜色 --- */
+#cpu {
+    color: #89dceb; /* 天蓝色 */
+}
+
+#custom-gpu {
+    color: #cba6f7; /* 薰衣草紫 */
+}
+#pulseaudio {
+    color: #fab387;
+}
+
+#pulseaudio.muted {
+    color: #f38ba8;
+}
+
+#network {
+    color: #a6e3a1;
+}
+
+#network.disconnected {
+    color: #f38ba8;
+}
+
+#backlight {
+    color: #f9e2af;
+}
+
+/* --- 笔记本核心：电池状态 --- */
+#battery {
+    color: #a6e3a1;
+}
+
+#battery.charging, #battery.plugged {
+    color: #94e2d5;
+}
+
+@keyframes blink {
+    to {
+        background-color: #f38ba8;
+        color: #1e1e2e;
+    }
+}
+
+#battery.warning:not(.charging) {
+    background-color: #fab387;
+    color: #1e1e2e;
+}
+
+#battery.critical:not(.charging) {
+    background-color: #f38ba8;
+    color: #1e1e2e;
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: steps(12);
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+/* --- 电源菜单 --- */
+#custom-power {
+    background-color: #f38ba8;
+    color: #1e1e2e;
+    border-radius: 10px;
+    padding: 0 5px;
+    margin-left: 6px;
+    font-size: 9px;
+}
+
+#cpu, #custom-gpu {
+    min-width: 50px;       /* 根据你的字号调整，确保能放下 100% 时的宽度 */
+    padding: 0 5px;        /* 调整内部间距 */
+    /* 配合下面的设置让文字居中 */
+}
+
+/* 注意：CPU 模块支持 warning 和 critical 状态，需要 config 里配置 states */
+#cpu.warning {
+    color: #fab387;
+}
+
+#cpu.critical {
+    color: #f38ba8;
+}

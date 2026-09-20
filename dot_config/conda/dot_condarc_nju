@@ -1,0 +1,21 @@
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+  - defaults
+
+show_channel_urls: true
+auto_activate_base: false
+
+default_channels:
+  - https://mirror.nju.edu.cn/anaconda/pkgs/main
+  - https://mirror.nju.edu.cn/anaconda/pkgs/r
+  - https://mirror.nju.edu.cn/anaconda/pkgs/msys2
+
+custom_channels:
+  conda-forge: https://mirror.nju.edu.cn/anaconda/cloud
+  msys2: https://mirror.nju.edu.cn/anaconda/cloud
+  bioconda: https://mirror.nju.edu.cn/anaconda/cloud
+  pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  nvidia: https://mirrors.sustech.edu.cn/anaconda-extra/cloud  
+  simpleitk: https://mirror.nju.edu.cn/anaconda/cloud

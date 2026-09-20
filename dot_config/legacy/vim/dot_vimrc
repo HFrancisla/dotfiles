@@ -1,0 +1,268 @@
+" =============================================================================
+" Part 0: Plugin Manager (自动安装与插件列表)
+" =============================================================================
+let data_dir = has('nvim') ? stdpath('data') . '/site' : '~/.vim'
+if empty(glob(data_dir . '/autoload/plug.vim'))
+  silent execute '!curl -fLo '.data_dir.'/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
+
+call plug#begin('~/.vim/plugged')
+
+" 外观主题
+Plug 'sainnhe/sonokai'
+
+" 状态栏及主题
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+
+" 文件搜索 (FZF)
+Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+Plug 'junegunn/fzf.vim'
+
+" 侧边栏文件树 (NERDTree)
+Plug 'preservim/nerdtree'
+
+" Git 集成 (Fugitive)
+Plug 'tpope/vim-fugitive'
+
+" 颜色显示 (Colorizer)
+Plug 'chrisbra/Colorizer'
+
+
+Plug 'jiangmiao/auto-pairs'
+Plug 'luochen1990/rainbow'
+
+
+call plug#end()
+
+" =============================================================================
+" Part 1: Basic Configurations
+" =============================================================================
+set encoding=utf-8
+set termencoding=utf-8
+set fileencodings=utf-8,ucs-bom,gb18030,gbk,gb2312,cp936,latin1
+
+" Viminfo 目录自动创建 (Neovim 使用默认的 shada)
+if !has('nvim')
+    let s:viminfo_dir = expand('~/.config/vim')
+    if !isdirectory(s:viminfo_dir)
+        call mkdir(s:viminfo_dir, 'p')
+    endif
+    set viminfofile=~/.config/vim/viminfo
+endif
+
+" 开启真彩色支持
+if has('termguicolors')
+    set termguicolors
+endif
+
+" 语法高亮与文件类型检测
+syntax on
+filetype plugin indent on
+let c_comment_strings=1         " 高亮 C 注释中的字符串
+let g:rainbow_active = 1
+
+" 行号与界面
+set number
+set relativenumber
+set cursorline
+set cc=80
+set ruler
+set showcmd
+set display=truncate
+set belloff=all
+
+" 剪贴板
+set clipboard=unnamedplus
+
+" 缩进设置
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
+set autoindent
+
+" 搜索与操作
+set scrolloff=3
+set incsearch
+set hlsearch
+set smartcase
+set ignorecase
+set wildmenu
+set history=200                 " 保持 200 行历史记录
+set backspace=indent,eol,start  " 允许在插入模式下退格删除一切
+set nrformats-=octal            " 禁止将 0 开头的数字视为八进制
+
+" 超时设置
+set ttimeout
+set ttimeoutlen=100
+
+" 代码折叠
+set foldmethod=indent
+set foldlevel=99
+
+" =============================================================================
+" Part 2: Key Mappings (按键映射)
+" =============================================================================
+let mapleader = "\<space>"
+
+" --- 基础导航 ---
+nnoremap H ^
+nnoremap L $
+nnoremap J 5j
+nnoremap K 5k
+nnoremap n nzzzv
+nnoremap N Nzzzv
+nnoremap <C-p> :tabprev<CR>
+nnoremap <C-n> :tabnext<CR>
+nnoremap c "_c
+nnoremap <C-e> %
+
+" --- Leader 常用功能 ---
+nnoremap <leader>b :Buffers<cr>
+nnoremap <leader>e :b#<cr>
+nnoremap <leader>w :w<cr>
+nnoremap <leader>q :bd<cr>
+nnoremap <leader>Q :qa<cr>
+nnoremap <leader>S :set spell!<CR>
+nnoremap <leader>W :set wrap!<CR>
+nnoremap <leader>C :set cursorcolumn!<CR>
+nnoremap <leader>H :set hlsearch!<CR>
+nnoremap <leader>t :tabnew<CR>
+nnoremap Q gq
+
+" --- 分屏操作 ---
+nnoremap <leader>x :split<CR>
+nnoremap <leader>v :vsplit<CR>
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+nnoremap <Tab> <C-w>w
+nnoremap <C-Left> :vertical resize -2<CR>
+nnoremap <C-Right> :vertical resize +2<CR>
+nnoremap <C-Up> :resize -2<CR>
+nnoremap <C-Down> :resize +2<CR>
+nnoremap <leader>= :wincmd =<CR>
+nnoremap <leader>o :only<CR>
+
+" --- 模式切换与插入 ---
+inoremap jf <esc>
+cnoremap jf <c-c>
+
+" 插入模式下使用 Ctrl+U 删除整行时，打断撤销树，方便单独撤销该删除
+inoremap <C-U> <C-G>u<C-U>
+
+vnoremap p pgvy
+vnoremap J 5j
+vnoremap K 5k
+vnoremap > >gv
+vnoremap < <gv
+
+" =============================================================================
+" Part 3: Plugin Specific Configurations (插件详细配置)
+" =============================================================================
+
+" --- FZF (文件模糊搜索) ---
+nnoremap <leader>f :Files<CR>
+nnoremap <leader>g :Rg<CR>
+let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.6 } }
+
+" --- NERDTree (侧边栏文件树) ---
+nnoremap <leader><Tab> :NERDTreeToggle<CR>
+
+" --- Vim-Fugitive (Git 管理) ---
+nnoremap <leader>gs :Git<CR>
+nnoremap <leader>dx :Gdiffsplit<CR>
+nnoremap <leader>dv :Gvdiffsplit<CR>
+
+" --- Colorizer (十六进制颜色显示) ---
+nnoremap <leader>ct :ColorHighlight<CR>
+nnoremap <leader>cr :ColorClear<CR>
+
+" =============================================================================
+" Part 4: Appearance, Autocmd & Mouse (外观、自动指令与鼠标)
+" =============================================================================
+" 光标样式切换
+let &t_SI ="\e[5 q"
+let &t_SR ="\e[3 q"
+let &t_EI ="\e[1 q"
+" 进出 Vim 时重置终端光标状态，防止光标样式残留
+let &t_ti .= "\e[1 q"
+let &t_te .= "\e[0 q"
+
+" 主题设置
+let g:sonokai_style = 'andromeda' "
+let g:sonokai_enable_italic = 1
+silent! colorscheme sonokai
+highlight LineNr ctermfg=208
+
+" 高亮行尾空格 (必须放在 colorscheme 之后才能生效)
+highlight ExtraWhitespace ctermbg=red guibg=red
+match ExtraWhitespace /\s\+$/
+
+" --- Airline 状态栏配置 ---
+set noshowmode
+let g:airline_theme = 'sonokai' 
+" 开启依赖 Nerd Font 的图标和箭头（底部状态栏）
+let g:airline_powerline_fonts = 1
+
+" --- 顶部标签栏 (Tabline) 设置 ---
+" 开启顶部标签栏
+let g:airline#extensions#tabline#enabled = 1
+" 智能显示文件名
+let g:airline#extensions#tabline#formatter = 'unique_tail'
+" 顶部标签栏的分隔符为直角/竖线
+let g:airline#extensions#tabline#left_sep = ' '
+let g:airline#extensions#tabline#left_alt_sep = '|'
+
+
+" 鼠标支持
+if has('mouse')
+  if &term =~ 'xterm'
+    set mouse=a
+  else
+    set mouse=nvi
+  endif
+endif
+
+" =============================================================================
+" 自动指令组 (Autocmd Groups)
+" =============================================================================
+augroup MyVimrcSetup
+    " 清除组内旧的自动命令，防止重复加载
+    autocmd!
+    " NERDTree: 当它是最后一个窗口时自动关闭 
+    autocmd BufEnter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+    " 格式化: 禁用自动插入注释领导符 
+    autocmd FileType * setlocal formatoptions-=c formatoptions-=r formatoptions-=o
+    " 自动创建目录: 保存文件时如果父目录不存在则自动创建 
+    autocmd BufWritePre * if !isdirectory(expand('<afile>:p:h')) | call mkdir(expand('<afile>:p:h'), 'p') | endif
+augroup END
+
+" 记住上次编辑的位置
+augroup vimStartup
+    autocmd!
+    autocmd BufReadPost * if line("'\"") >= 1 && line("'\"") <= line("$") && &ft !~# 'commit' | exe "normal! g`\"" | endif
+augroup END
+
+" =============================================================================
+" Part 5: Custom Functions (自定义函数)
+" =============================================================================
+
+" 差异对比命令
+if !exists(":DiffOrig")
+  command DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | diffthis
+          \ | wincmd p | diffthis
+endif
+
+" --- 一键清除行尾多余空格 ---
+function! CleanExtraSpaces()
+    let save_cursor = getpos(".")
+    let old_query = getreg('/')
+    silent! %s/\s\+$//e
+    call setpos('.', save_cursor)
+    call setreg('/', old_query)
+    echo "✨ 已清除行尾多余空格！"
+endfunction
+command CleanSpace call CleanExtraSpaces()

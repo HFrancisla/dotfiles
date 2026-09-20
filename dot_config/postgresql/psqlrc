@@ -1,0 +1,41 @@
+-- ==========================================
+-- psqlrc - PostgreSQL 交互式客户端配置
+-- 路径: $XDG_CONFIG_HOME/postgresql/psqlrc
+-- 需要在 zshenv 中设置 PSQLRC 环境变量指向此文件
+-- ==========================================
+\set QUIET 1
+
+-- --- 1. 输出格式 ---
+\timing on
+\pset null '⟨NULL⟩'
+\pset linestyle unicode
+\pset border 2
+\x auto
+-- 用 PSQL_PAGER 而非 PAGER，避免 --only-for-tables 回退时递归调用 pspg 自身
+\setenv PSQL_PAGER 'pspg --no-mouse --only-for-tables'
+
+-- --- 2. 提示符 ---
+-- %n=用户 %M=主机 %/=数据库 %R=连接状态 %x=事务状态 %#=角色标识
+\set PROMPT1 '%n@%M:%/%R%x%# '
+\set PROMPT2 '%R%x  ... > '
+
+-- --- 3. 历史记录 (XDG 路径，按数据库分离) ---
+-- 需要确保目录存在: mkdir -p "$XDG_STATE_HOME/postgresql"
+\getenv xdg_state XDG_STATE_HOME
+\set HISTFILE :xdg_state/postgresql/psql_history-:DBNAME
+\set HISTCONTROL ignoredups
+
+-- --- 4. 行为 ---
+\set COMP_KEYWORD_CASE upper
+\set VERBOSITY verbose
+\set ON_ERROR_ROLLBACK interactive
+
+-- --- 5. 查询别名 (可选，按需取消注释) ---
+-- 使用方式: 输入 :别名名 回车执行
+-- 需要 pg_stat_statements 扩展:
+-- \set show_slow_queries 'SELECT (total_exec_time / 1000 / 60) as total_min, mean_exec_time as avg_ms, calls, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 20;'
+\set show_tables 'SELECT schemaname || ''.'' || tablename AS full_name, pg_size_pretty(pg_total_relation_size(schemaname || ''.'' || tablename)) AS size FROM pg_tables WHERE schemaname NOT IN (''pg_catalog'', ''information_schema'') ORDER BY pg_total_relation_size(schemaname || ''.'' || tablename) DESC;'
+\set show_connections 'SELECT datname, usename, client_addr, state, count(*) AS cnt FROM pg_stat_activity GROUP BY 1,2,3,4 ORDER BY 5 DESC;'
+\set show_locks 'SELECT pid, usename, pg_blocking_pids(pid) as blocked_by, query as blocked_query FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0;'
+
+\unset QUIET

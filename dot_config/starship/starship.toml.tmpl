@@ -1,0 +1,196 @@
+format = """\
+[╭╴](fg:arrow)\
+$username\
+$os\
+(\
+    $directory\
+)\
+$git_branch\
+(\
+    via \
+    $python\
+    $conda\
+    $nodejs\
+    $c\
+    $rust\
+    $java\
+)
+[╰─](fg:arrow)$character\
+"""
+
+right_format="""
+$cmd_duration\
+$env_var
+$status
+"""
+
+
+# Add the modules you need
+
+# Disable the blank line at the start of the prompt
+add_newline = false
+
+palette = "normal"
+
+[palettes.normal]
+arrow = "#c678dd"
+os = "#c678dd"
+os_admin = "#e4ff1a"
+directory = "#e5c07b"
+time = "#bdfffd"
+node = "#a5e6ba"
+git = "#56b6c2"
+git_status = "#DFEBED"
+python = "#edf67d"
+conda = "#70e000"
+java = "#F86279"
+rust = "#ffdac6"
+clang = "#caf0f8"
+duration = "green"
+text_color = "#EDF2F4"
+text_light = "#26272A"
+
+# some modules (Rust, Java...) disabled ,enable them if needed.
+
+[username]
+style_user = 'bold os'
+style_root = 'bold os_admin'
+format = '[  $user](fg:$style) '
+disabled = false
+show_always = true
+
+[os]
+format = "[$symbol]($style) "
+style = "bold blue"
+disabled = false
+
+[os.symbols]
+Alpine = " "
+Arch = " "
+Debian = " "
+EndeavourOS = " "
+Fedora = " "
+Linux = " "
+Macos = " "
+Manjaro = " "
+Mint = " "
+NixOS = " "
+openSUSE = " "
+Pop = " "
+SUSE = " "
+Ubuntu = " "
+Windows = " "
+
+[status]
+disabled = false
+format = '[$status](fg:red) '
+
+[character]
+# 默认即是 Insert 模式
+success_symbol = "[▸](fg:arrow)"
+error_symbol = "[▸](fg:arrow)[✘](fg:red)"
+
+{{ if eq .chezmoi.os "linux" -}}
+# ==========================================
+# Starship Vi Mode Prompt Configuration in Linux
+# ==========================================
+# Normal (Command) 模式的符号
+vimcmd_symbol = "[◂](fg:blue)"
+
+# Visual 模式的符号 (例如在 Normal 模式下按 v 选中文字时)
+vimcmd_visual_symbol = "[◂](fg:yellow)"
+
+# Replace 模式的符号 (例如按 R 进入替换模式时)
+vimcmd_replace_symbol = "[◂](fg:red)"
+vimcmd_replace_one_symbol = "[◂](fg:red)"
+{{- end }}
+
+[directory]
+format = "[$read_only]($read_only_style)[$path](bold $style) "
+truncation_length = 15
+style = "fg:directory"
+read_only_style = "fg:directory"
+before_repo_root_style = "fg:directory"
+truncation_symbol = "…/"
+truncate_to_repo = false
+read_only = " "
+
+[time]
+disabled = true
+format = "at [󱑈 $time]($style)"
+time_format = "%H:%M"
+style = "bold fg:time"
+
+[cmd_duration]
+format = "[ $duration]($style) "
+style = "bold fg:duration"
+min_time = 1000
+
+[git_branch]
+format = "[$symbol$branch(:$remote_branch)]($style) "
+style = "bold fg:git"
+
+[git_status]
+format = '[ $all_status$ahead_behind ]($style)'
+style = "fg:text_color bg:git"
+disabled = true
+
+[docker_context]
+disabled = true
+symbol = " "
+
+# Disable the package module, hiding it from the prompt completely
+[package]
+disabled = true
+
+[fill]
+symbol = " "
+
+[nodejs]
+format = "[ $symbol$version ]($style)"
+style = "bg:node fg:text_light"
+symbol = " "
+version_format = "${raw}"
+disabled = false
+
+[python]
+disabled = false
+format = '[ ${symbol}${pyenv_prefix}(${version})( \($virtualenv\)) ]($style)'
+symbol = " "
+version_format = "${raw}"
+style = "bg:python fg:text_light"
+
+[conda]
+format = "[ $symbol$environment ]($style)"
+style = "bg:conda fg:text_light"
+ignore_base = false
+disabled = false
+symbol = " "
+
+[java]
+format = "[ $symbol$version ]($style)"
+style = "bg:java fg:text_light"
+version_format = "${raw}"
+symbol = " "
+disabled = false
+
+[c]
+format = "[ $symbol($version(-$name)) ]($style)"
+style = "bg:clang fg:text_light"
+symbol = " "
+version_format = "${raw}"
+disabled = false
+
+[rust]
+format = "[ $symbol$version ]($style)"
+style = "bg:rust fg:text_light"
+symbol = " "
+version_format = "${raw}"
+disabled = false
+
+[env_var.all_proxy]
+variable = 'all_proxy'
+format = "[$env_value]($style) "
+default = ''
+style = 'bold #82AAFF'
+

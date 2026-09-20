@@ -1,0 +1,321 @@
+# ==============================================================================
+# 用户自定义别名 (Aliases) & 增强函数 (Functions)
+# ==============================================================================
+
+# -------------------- 1. 基础系统与配置文件 --------------------
+alias vim="nvim"
+alias zshcfg="chezmoi edit ~/.config/zsh/.zshrc"      # 快速编辑 zsh 主配置
+alias aliascfg="chezmoi edit ~/.config/zsh/alias.zsh" # 快速编辑此别名文件
+alias reload="source \$ZDOTDIR/.zshrc && echo 'Zsh config reloaded!'" 
+
+# -------------------- 2. 现代工具集成 --------------------
+# eza: 下一代 ls (Rust 编写)
+alias ls="eza --classify --icons=always --color-scale --group-directories-first --time-style iso"
+alias ll="ls --long --header --links --group"
+alias la="ls -a"
+alias cat="bat --paging=never"
+alias grep="grep --color=auto"
+
+# ==========================================
+# Zsh 后缀别名配置 (Suffix Aliases)
+# ==========================================
+# 代码与文本文件：绑定到默认编辑器
+alias -s {txt,md,json,yaml,yml,conf,ini}="$EDITOR"
+alias -s {c,cpp,py,js,ts,go,java,html,css}="$EDITOR"
+# 压缩包查看：直接输入压缩包名，即可列出内容（而不是直接解压，更安全）
+alias -s zip="unzip -l"
+alias -s {tar,tar.gz,tgz}="tar -tvf"
+
+# -------------------- 3. 包管理器 (Arch Linux / yay) --------------------
+if command -v pacman &> /dev/null; then
+    alias pacin='sudo pacman -S --needed'     # 仅安装缺失包
+    alias pacup='sudo pacman -Syu'            # 系统更新
+fi
+
+if command -v yay &> /dev/null; then
+    # PATH=/usr/bin 前置：防止 mise/linuxbrew 等遮蔽系统 Python 导致 AUR 构建失败
+    alias yay='PATH=/usr/bin:$PATH yay'
+    alias makepkg='PATH=/usr/bin:$PATH makepkg'
+    alias yayin='yay -S --needed'
+fi
+
+# -------------------- 4. 专属业务函数 (MATLAB) --------------------
+# mrun: 启动 MATLAB 并按当前时间生成独立日志文件
+mrun() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: mrun <script_name>"
+        return 1
+    fi
+    local current_time=$(date +%Y_%m_%d-%H_%M_%S)
+    local log_file="${current_time}.log"
+    echo "Starting MATLAB. Logging to: $log_file"
+
+    # 自动检测 MATLAB 命令 (WSL 使用 matlab.exe，原生 Linux 使用 matlab)
+    local matlab_cmd
+    if grep -qEi '(Microsoft|WSL)' /proc/version 2>/dev/null; then
+        matlab_cmd="matlab.exe"
+    else
+        matlab_cmd="matlab"
+    fi
+
+    if ! command -v "$matlab_cmd" &>/dev/null; then
+        echo "Error: $matlab_cmd not found in PATH" >&2
+        return 1
+    fi
+
+    "$matlab_cmd" -nodesktop -nosplash -logfile "$log_file" -r "$@"
+}
+
+# -------------------- 5. 高阶 Git 扩展 --------------------
+# 基础操作 (OMZ git 插件已提供 gst, gco, ga, gcmsg 等)
+alias gcl1="git clone --depth=1"              # 浅克隆：仅拉取最新一次提交 (加速查看开源代码)
+alias gundo="git reset HEAD~1 --mixed"        # 撤销提交，保留代码
+alias gnuke="git clean -df && git reset --hard" # 强制毁灭性重置 (慎用)
+alias gtree="git log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all"
+
+# fgb: 交互式切换分支 (基于 fzf)
+fgb() {
+  local branch
+  branch=$(git branch -a --color=always | grep -v '/HEAD\s' | sort |
+    fzf --ansi --multi --tac --preview-window right:70% \
+        --preview 'git log --oneline --graph --date=short --color=always --pretty="format:%C(auto)%cd %h%d %s" $(sed s/^..// <<< {} | cut -d" " -f1)' |
+    sed 's/^..//' | cut -d' ' -f1 | sed 's#^remotes/##')
+  [[ -n "$branch" ]] && git checkout "$branch"
+}
+
+# -------------------- 6. Python uv 虚拟环境 --------------------
+# uvact: 向上查找 .venv 并激活
+uvact() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -f "$dir/.venv/bin/activate" ]]; then
+            source "$dir/.venv/bin/activate"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    echo "No .venv found in parent directories" >&2
+    return 1
+}
+
+# -------------------- 7. 容器化工具 (Docker) --------------------
+if command -v docker &> /dev/null; then
+    # 格式化列表：ID | 容器名 | 状态 | 镜像
+    alias dps="docker ps --format 'table {{ "{{.ID}}" }}\t{{ "{{.Names}}" }}\t{{ "{{.Status}}" }}\t{{ "{{.Image}}" }}'"
+    alias dstopall="docker stop \$(docker ps -q)"
+    alias dprune="docker system prune -a -f --volumes" # 清理所有冗余
+    
+    # fdex: 交互式进入容器终端
+    fdex() {
+        local container
+        container=$(docker ps --format '{{ "{{.Names}}" }}' | fzf --height 40% --reverse --prompt="Select container: ")
+        if [[ -n "$container" ]]; then
+            docker exec -it "$container" bash || docker exec -it "$container" sh
+        fi
+    }
+fi
+
+# -------------------- 8. 快速系统更新 --------------------
+{{- if eq .chezmoi.osRelease.id "ubuntu" }}
+alias sysup='sudo apt update && sudo apt upgrade -y && brew update && brew upgrade'
+{{- end }}
+
+if command -v docker-compose &> /dev/null || command -v docker &> /dev/null; then
+    alias dco="docker compose"
+    alias dcup="docker compose up -d"
+    alias dcdn="docker compose down"
+    alias dclg="docker compose logs -f"
+fi
+
+# -------------------- 9. 快速文件查找与跳转 --------------------
+# cdf: 模糊搜索指定目录（默认当前目录）下的文件，并 cd 到该文件所在的文件夹
+cdf() {
+    local search_dir="${1:-.}"
+    local file
+    file=$(fd --type f . "$search_dir" | fzf --preview 'bat --color=always {}') || return
+    cd "$(dirname "$file")"
+}
+
+# ==============================================================================
+# 10. 批量 Git 拉取 (gpall)
+# ==============================================================================
+# 一次把当前目录下（以及更深层）的所有仓库安全地 pull 一遍，替代逐个 cd。
+#   gpall              当前目录自身 + 下一层子目录（默认）
+#   gpall -n 2         向下递归 2 层（-n 0 = 只处理起点目录自身）
+#   gpall --all        递归全部层级
+#   gpall <dir>...     指定起点
+#
+# 策略：git pull --ff-only --prune（只快进，绝不自动制造 merge commit）
+#       脏工作区 / 游离 HEAD / 无远端 一律跳过并汇总，不碰你未提交的改动
+#
+# 退出码：0 = 没有仓库失败（含一个都没找到）；1 = 有仓库拉取失败；2 = 参数错误
+# ==============================================================================
+
+# 递归扫描时需要跳过的目录名（依赖/构建/缓存，避免误扫与性能损耗）
+_gpall_pruned=".git node_modules .venv venv .direnv target vendor dist build .cache .next .tox __pycache__ .mypy_cache .pytest_cache .ruff_cache site-packages"
+
+# 递归查找仓库；命中仓库即停止下潜，因此不会误拉子模块内部嵌套的仓库
+_gpall_walk() {
+    local dir="$1" depth="$2" max="$3" sub base
+    (( depth > max )) && return 0
+    for sub in "$dir"/*(N/) "$dir"/.[!.]*(N/); do
+        [[ -L "$sub" ]] && continue                       # 不跟随符号链接，防止绕圈
+        base="${sub:t}"
+        [[ " $_gpall_pruned " == *" $base "* ]] && continue
+        if [[ -e "$sub/.git" ]]; then
+            print -r -- "${sub:A}"                        # 命中仓库：不再向下深入
+        else
+            _gpall_walk "$sub" $(( depth + 1 )) "$max"
+        fi
+    done
+}
+
+gpall() {
+    emulate -L zsh
+    setopt local_options no_aliases
+
+    local -a roots=() repos=() disp=() branches=() hints=() parts=()
+    local max_depth=1
+
+    while (( $# )); do
+        case "$1" in
+            -n)     shift; max_depth="${1-}" ;;
+            -n<->)  max_depth="${1#-n}" ;;
+            --all)  max_depth=999 ;;
+            --)     shift; roots+=( "$@" ); break ;;
+            -*)     print -u2 "gpall: 未知选项 '$1'（用法: gpall [-n 层级|--all] [目录...]）"; return 2 ;;
+            *)      roots+=( "$1" ) ;;
+        esac
+        shift
+    done
+
+    if [[ "$max_depth" != <-> ]]; then
+        print -u2 "gpall: -n 需要一个非负整数（用法: gpall [-n 层级|--all] [目录...]）"
+        return 2
+    fi
+    (( ${#roots} )) || roots=( . )
+
+    # ---- 1. 扫描仓库 ----
+    local base="${PWD:A}"        # 展示基准：位于其下的路径显示为相对路径
+    local -a places=()
+    local root found
+    for root in "${roots[@]}"; do
+        if [[ ! -d "$root" ]]; then
+            print -u2 "gpall: 目录不存在，已忽略: $root"
+            continue
+        fi
+        root="${root:A}"
+        if   [[ "$root" == "$base" ]];   then places+=( "." )
+        elif [[ "$root" == "$base"/* ]]; then places+=( "${root#"$base"/}" )
+        else                                   places+=( "$root" ); fi
+        [[ -e "$root/.git" ]] && repos+=( "$root" )
+        found="$(_gpall_walk "$root" 1 "$max_depth")"
+        [[ -n "$found" ]] && repos+=( "${(@f)found}" )
+    done
+    places=( "${(ou)places[@]}" )
+    repos=( "${(ou)repos[@]}" )        # 去重 + 排序，保证输出稳定
+
+    if (( ${#repos} == 0 )); then
+        print -u2 "gpall: 没有找到任何 git 仓库"
+        return 0
+    fi
+
+    # ---- 2. 展示名 / 分支 / 列宽（纯本地操作，不走网络）----
+    local p b w=4 bw=6
+    for p in "${repos[@]}"; do
+        if   [[ "$p" == "$base" ]];   then disp+=( "." )
+        elif [[ "$p" == "$base"/* ]]; then disp+=( "${p#"$base"/}" )
+        else                                disp+=( "$p" ); fi
+        b="$(git -C "$p" symbolic-ref --quiet --short HEAD 2>/dev/null)" || b=""
+        branches+=( "${b:-(detached)}" )
+    done
+    for p in "${disp[@]}";     do (( ${#p} > w ))  && w=${#p};  done
+    for b in "${branches[@]}"; do (( ${#b} > bw )) && bw=${#b}; done
+
+    local c_rst='' c_bld='' c_dim='' c_red='' c_grn='' c_ylw=''
+    if [[ -t 1 && -z "${NO_COLOR-}" && "${TERM-}" != dumb ]]; then
+        c_rst=$'\e[0m'; c_bld=$'\e[1m'; c_dim=$'\e[2m'
+        c_red=$'\e[31m'; c_grn=$'\e[32m'; c_ylw=$'\e[33m'
+    fi
+
+    print -r -- "${c_bld}gpall${c_rst} ${c_dim}· 扫描 ${(j:, :)places} · 命中 ${#repos} 个仓库${c_rst}"
+    print
+    printf '%s%-*s  %-*s  %s%s\n' "$c_dim" "$w" "REPO" "$bw" "BRANCH" "RESULT" "$c_rst"
+
+    # ---- 3. 逐个仓库处理 ----
+    local idx repo branch before after out state color text detail
+    local n_upd=0 n_clean=0 n_skip=0 n_fail=0
+
+    for idx in {1..${#repos[@]}}; do
+        repo="${repos[idx]}"
+        branch="${branches[idx]}"
+        state='' detail=''
+
+        if [[ "$branch" == "(detached)" ]]; then
+            state=SKIP_DETACHED
+        elif ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+            # 区分「没有配置任何远端」与「有远端但没设 upstream」，否则修复命令会指错方向
+            if [[ -z "$(git -C "$repo" remote 2>/dev/null)" ]]; then state=SKIP_NO_REMOTE
+            else                                                   state=SKIP_NO_UPSTREAM; fi
+        elif [[ -n "$(git -C "$repo" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+            state=SKIP_DIRTY
+        else
+            before="$(git -C "$repo" rev-parse HEAD 2>/dev/null)"
+            if out="$(GIT_TERMINAL_PROMPT=0 git -C "$repo" pull --ff-only --prune 2>&1)"; then
+                after="$(git -C "$repo" rev-parse HEAD 2>/dev/null)"
+                if [[ "$before" != "$after" ]]; then
+                    state=UPDATED
+                    detail="+$(git -C "$repo" rev-list --count "$before..$after")"
+                else
+                    state=UPTODATE
+                fi
+            elif [[ "$out" == *"Not possible to fast-forward"* || "$out" == *"diverged"* ]]; then
+                state=DIVERGED
+            else
+                state=FAILED; detail="${out%%$'\n'*}"
+            fi
+        fi
+
+        case "$state" in
+            UPDATED)          color="$c_grn"; text="✓ updated ${detail} commits" ;;
+            UPTODATE)         color="$c_dim"; text="✓ already up to date" ;;
+            SKIP_DIRTY)       color="$c_ylw"; text="⚠ skipped: uncommitted changes" ;;
+            SKIP_DETACHED)    color="$c_ylw"; text="⚠ skipped: detached HEAD" ;;
+            SKIP_NO_UPSTREAM) color="$c_ylw"; text="⚠ skipped: no upstream branch" ;;
+            SKIP_NO_REMOTE)   color="$c_ylw"; text="⚠ skipped: no remote configured" ;;
+            DIVERGED)         color="$c_red"; text="✗ diverged from upstream" ;;
+            FAILED)           color="$c_red"; text="✗ failed: ${detail}" ;;
+            *)                color="$c_red"; text="✗ unknown state" ;;
+        esac
+
+        printf '%s%-*s%s  %-*s  %s%s%s\n' "$c_bld" "$w" "${disp[idx]}" "$c_rst" "$bw" "$branch" "$color" "$text" "$c_rst"
+
+        case "$state" in
+            UPDATED)          (( n_upd += 1 )) ;;
+            UPTODATE)         (( n_clean += 1 )) ;;
+            SKIP_DIRTY)       (( n_skip += 1 )); hints+=( "${disp[idx]}: 有未提交改动 → git -C '${disp[idx]}' status（处理完可重跑 gpall）" ) ;;
+            SKIP_DETACHED)    (( n_skip += 1 )); hints+=( "${disp[idx]}: 游离 HEAD → git -C '${disp[idx]}' switch main" ) ;;
+            SKIP_NO_UPSTREAM) (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有上游分支 → git -C '${disp[idx]}' branch -u origin/main" ) ;;
+            SKIP_NO_REMOTE)   (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有配置任何远端 → git -C '${disp[idx]}' remote add origin <url>" ) ;;
+            DIVERGED)         (( n_fail += 1 )); hints+=( "${disp[idx]}: 与上游分叉 → git -C '${disp[idx]}' log --oneline --left-right --graph '@{u}...HEAD'" ) ;;
+            FAILED)           (( n_fail += 1 )); hints+=( "${disp[idx]}: ${detail}" ) ;;
+        esac
+    done
+
+    # ---- 4. 汇总 ----
+    print
+    (( n_upd ))   && parts+=( "${c_grn}${n_upd} 个已更新${c_rst}" )
+    (( n_clean )) && parts+=( "${c_dim}${n_clean} 个已是最新${c_rst}" )
+    (( n_skip ))  && parts+=( "${c_ylw}${n_skip} 个已跳过${c_rst}" )
+    (( n_fail ))  && parts+=( "${c_red}${n_fail} 个失败${c_rst}" )
+    print -r -- "${c_bld}共 ${#repos} 个仓库${c_rst} ${(j: · :)parts}"
+
+    if (( ${#hints} )); then
+        print
+        print -r -- "${c_dim}需要你手动处理的:${c_rst}"
+        for p in "${hints[@]}"; do print -r -- "  · $p"; done
+    fi
+
+    (( n_fail > 0 )) && return 1
+    return 0
+}

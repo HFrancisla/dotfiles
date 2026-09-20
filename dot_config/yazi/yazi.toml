@@ -1,0 +1,16 @@
+[plugin]
+prepend_previewers = [
+  { url = "*.md", run = "glow" },
+]
+
+[[plugin.prepend_fetchers]]
+id    = "git"
+url   = "*"
+run   = "git"
+group = "normal"
+
+[[plugin.prepend_fetchers]]
+id    = "git"
+url   = "*/"
+run   = "git"
+group = "normal"

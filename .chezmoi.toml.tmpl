@@ -1,0 +1,19 @@
+# chezmoi 全局配置
+# 文档: https://www.chezmoi.io/reference/configuration-file/
+
+[diff]
+    # 与 git core.pager 保持一致的美化输出
+    # -R: 原始控制字符  -F: 不满一屏自动退出  -X: 不清屏
+    pager = "diff-so-fancy | less --tabs=4 -RFX"
+
+[update]
+    # update 时默认应用变更
+    apply = true
+
+# ==========================================
+# 用户个人数据 (由 chezmoi init 时交互填写)
+# 渲染后存入 ~/.config/chezmoi/chezmoi.toml，不会推送到 git
+# ==========================================
+[data]
+    name  = "{{ promptStringOnce . "name"  "Git 提交者姓名" }}"
+    email = "{{ promptStringOnce . "email" "Git 提交者邮箱" }}"

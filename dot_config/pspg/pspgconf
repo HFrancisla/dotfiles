@@ -1,0 +1,23 @@
+# ==========================================
+# pspg 配置文件
+# 路径: $XDG_CONFIG_HOME/pspg/pspgconf
+# 需要在 zshenv 中设置 PSPG_CONF 环境变量指向此文件
+# 文档: https://github.com/okbob/pspg
+# ==========================================
+
+# --- 主题 ---
+# 22 = Relational pipes theme (深色背景)
+# 完整列表: pspg --help 或 README 中 Themes 表
+theme = 22
+
+# --- 行为 ---
+no_mouse = true
+no_sound = true
+show_scrollbar = true
+last_row_search = true
+progressive_load_mode = true
+empty_string_is_null = true
+
+# --- 边框 ---
+# 0=无边框  1=单线  2=双线
+border_type = 2

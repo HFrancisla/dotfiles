@@ -1,0 +1,12 @@
+[tools]
+# Node.js - 使用最新 LTS 版本
+node = "lts"
+
+# Lua - Neovim 需要 5.1 兼容
+lua = "5.1"
+python = "3.13"
+java = "temurin-21"
+
+[settings]
+# 进入包含 .mise.toml / .tool-versions 的目录时自动安装缺失的工具
+auto_install = false

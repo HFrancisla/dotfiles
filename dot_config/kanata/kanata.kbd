@@ -1,0 +1,53 @@
+(defcfg
+  process-unmapped-keys yes
+)
+
+(defsrc
+  caps
+  q w e r
+  s d f
+  h j k l ;
+  p [ ]
+  bspc ret lalt
+)
+
+(defalias
+  caps (tap-hold-press 200 200 caps (layer-toggle caps_layer))
+  q_dline (macro end S-home bspc)
+  bsp_dl  (macro home S-end del)
+  db      (macro S-home del)
+  de      (macro S-end del)
+  ret_wh  (macro end ret)
+  md5     (macro down down down down down)
+  mu5     (macro up up up up up)
+  sd5     (macro S-down S-down S-down S-down S-down)
+  su5     (macro S-up S-up S-up S-up S-up)
+  lalt_tgl (layer-toggle caps_alt_layer)
+)
+
+(deflayer base
+  @caps
+  q w e r
+  s d f
+  h j k l ;
+  p [ ]
+  bspc ret lalt
+)
+
+(deflayer caps_layer
+  _
+  @q_dline bspc up del
+  left down right
+  S-left S-down S-up S-right end
+  home @db @de
+  @bsp_dl @ret_wh @lalt_tgl
+)
+
+(deflayer caps_alt_layer
+  _
+  _ _ @mu5 _
+  _ @md5 _
+  S-home @sd5 @su5 S-end _
+  _ _ _
+  _ _ _
+)

@@ -1,0 +1,63 @@
+# vi: ft=dosini
+# ==========================================
+# iredis 配置文件
+# 路径: $XDG_CONFIG_HOME/iredis/iredisrc
+# 需要在 zshenv 中设置: export IREDIS_CONFIG="$XDG_CONFIG_HOME/iredis/iredisrc"
+# 对照: dot_config/pgcli/config
+# ==========================================
+
+[main]
+
+# --- 1. 补全 (对应 pgcli smart_completion) ---
+# iredis 使用 LRU 策略存储补全项 (keys, set members 等)
+completer_max = 300
+
+# 补全大小写: lower / upper / auto
+# pgcli: keyword_casing = upper → iredis 没有 keyword_casing, 但可通过 completion_casing 控制
+completion_casing = auto
+
+# --- 2. 新手模式 (pgcli 无对应) ---
+# 显示命令描述和选项提示，适合 Redis 新手
+newbie_mode = False
+
+# --- 3. 输出格式 ---
+# 是否使用原始 Redis 响应格式 (类似 redis-cli 的 --raw)
+raw = False
+
+# 响应解码方式 (默认不解码，显示原始字节)
+# 设置为 utf-8 以自动解码字符串响应
+decode = utf-8
+
+# --- 4. Pager (对应 pgcli enable_pager / pager) ---
+# pgcli: pager = pspg --no-mouse --pgcli-fix
+# iredis 输出非表格，使用 less 更合适
+enable_pager = True
+pager = less -SRXF
+
+# --- 5. 提示符 (对应 pgcli §5) ---
+# pgcli: \u@\H:\d\T\# → iredis 使用 Python format 语法
+# 可用变量: {host} {port} {db} {username} {client_name} {client_addr} {client_id} {path}
+# 格式: "主机:端口[库号]> "
+# 注意: iredis 不支持 prompt 中的 ANSI 颜色转义 (ConfigObj 不解释 \x1b)
+# 如需彩色提示符，可设置 rainbow = True (但颜色不可自定义)
+prompt = {host}:{port}[{db}]> 
+
+# --- 6. 彩虹提示符 (pgcli 无对应) ---
+# 用彩虹色渲染提示符
+rainbow = False
+
+# --- 7. 连接可靠性 ---
+# 连接错误/超时的重试次数
+retry_times = 2
+# TCP keepalive
+socket_keepalive = True
+
+# --- 8. Shell 命令支持 ---
+# 允许在 iredis 中运行 shell 命令 (如: get json-str | jq .)
+# 注意: 这允许在 REPL 中执行任意 shell 命令
+shell = True
+
+# --- 9. DSN 别名 (对应 pgcli §11) ---
+[alias_dsn]
+# local = redis://localhost:6379/0
+# staging = redis://readonly@staging.example.com:6379/1

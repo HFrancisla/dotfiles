@@ -1,0 +1,116 @@
+# ==========================================
+# 1. 核心仓库说明（仅在 Git 仓库保留，不同步到家目录）
+# ==========================================
+README.md
+LICENSE
+.github/
+.gitignore
+scripts/
+docs/
+install*.sh
+
+# ==========================================
+# 2. Neovim (LazyVim) 运行时与冗余文件
+# ==========================================
+# 插件版本锁，建议每台机器独立生成
+.config/nvim/lazy-lock.json
+# 示例文件，清理配置用
+.config/nvim/lua/plugins/example.lua
+# 自动生成的本地 LSP 配置
+.config/nvim/.neoconf.json
+# 常见的运行时临时文件
+.config/nvim/.netrwhist
+.config/nvim/undo/
+.config/nvim/spell/*.add.spl
+
+# ==========================================
+# 3. Shell (Zsh) 动态数据
+# ==========================================
+# 绝对不要同步历史记录，否则会导致多机同步冲突
+.config/zsh/.zsh_history
+.zsh_history
+# 补全缓存文件
+.config/zsh/.zcompdump*
+.zcompdump*
+
+# ==========================================
+# 3.5. PostgreSQL (psql) 运行时数据
+# ==========================================
+# 历史记录（XDG 路径下的按库分离历史）
+.local/state/postgresql/
+# 默认路径兜底（万一跳过 psqlrc 启动）
+.psql_history*
+
+# ==========================================
+# 3.6. MySQL (mycli) 运行时数据
+# ==========================================
+.mysql_history
+.mycli-history
+.mycli.log
+
+# ==========================================
+# 3.7. Redis (iredis) 运行时数据
+# ==========================================
+.rediscli_history
+.iredis_history
+
+# ==========================================
+# 4. 语言环境与包管理器缓存
+# ==========================================
+# Python
+**/__pycache__/
+**/*.pyc
+.python_history
+.venv/
+# Node.js
+**/node_modules/
+.npm/
+.node_repl_history
+# Rust
+.cargo/registry/
+.cargo/git/
+
+# ==========================================
+# 5. 系统级别杂物 (OS Specific)
+# ==========================================
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# 6. 机器本地配置 (由 install_desktop.sh 自动生成)
+# ==========================================
+# 基于硬件检测生成的 GPU 环境变量等，每台机器不同
+.config/hypr/local.conf
+
+# ==========================================
+# 7. 桌面环境配置 (仅 Arch Linux + Hyprland 需要)
+# ==========================================
+# 非 Arch 环境 (如 WSL Ubuntu) 无 Wayland/Hyprland，跳过桌面相关配置
+{{- if ne .chezmoi.osRelease.id "arch" }}
+.config/hypr/
+.config/waybar/
+.config/kanata/
+.config/anyrun/
+.config/systemd/
+.config/chrome-flags.conf
+.config/wallpapers/
+{{- end }}
+
+# ==========================================
+# 8. Tmux 插件 (TPM 运行时管理)
+# ==========================================
+.config/tmux/plugins/
+
+# ==========================================
+# 9. SSH 与敏感安全状态 (关键)
+# ==========================================
+# 同步 config 但忽略运行时的状态文件
+.ssh/known_hosts
+.ssh/known_hosts.old
+.ssh/sockets/
+# 忽略随机生成的密钥对（除非你确定要用 chezmoi 管理它们）
+**/*.pem
+**/*.key

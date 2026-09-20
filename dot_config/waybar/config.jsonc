@@ -1,0 +1,137 @@
+// ~/.config/waybar/config.jsonc
+{
+    "layer": "top",
+    "position": "top",
+    "height": 16,
+    "spacing": 2,
+
+    "modules-left": [
+        "hyprland/workspaces",
+        "hyprland/window"
+    ],
+    "modules-center": [
+        "clock"
+    ],
+    "modules-right": [
+        "tray",
+        "idle_inhibitor",
+		"cpu",
+		"custom/gpu",
+        "pulseaudio",
+        "network",
+        "backlight",
+        "battery",
+        "custom/power"
+    ],
+
+    // --- 模块详细配置 ---
+    "hyprland/workspaces": {
+        "disable-scroll": true,
+        "all-outputs": true,
+        "warp-on-scroll": false,
+        "format": "{icon}",
+        "format-icons": {
+            "1": "",
+            "2": "",
+            "3": "",
+            "4": "",
+            "5": "",
+            "urgent": "",
+            "active": "",
+            "default": ""
+        },
+        "window-rewrite": {
+            "class<firefox>": "",
+            "class<chromium>": "",
+            "class<google-chrome>": "",
+            "class<Code>": "",
+            "class<code>": "",
+            "class<kitty>": "",
+            "class<Alacritty>": "",
+            "class<foot>": "",
+            "class<thunar>": "",
+            "class<Spotify>": "",
+            "class<discord>": "",
+            "class<telegram>": "",
+            "class<microsoft-edge>": ""
+        },
+        "window-rewrite-default": ""
+    },
+    "hyprland/window": {
+        "format": "👉 {}",
+        "max-length": 50
+    },
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": "",
+            "deactivated": ""
+        }
+    },
+    "tray": {
+        "spacing": 10
+    },
+    "clock": {
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+        "format-alt": "{:%Y-%m-%d}"
+    },
+    "backlight": {
+        "format": "{percent}% {icon}",
+        "format-icons": ["", "", "", "", "", "", "", "", ""]
+    },
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{capacity}% {icon}",
+		"format-charging": "{capacity}% ",
+		"format-plugged": "{capacity}% ",
+		"format-alt": "{time} {icon}",
+		"format-icons": ["", "", "", "", ""]
+    },
+    "network": {
+        "format-wifi": "{essid} ({signalStrength}%) ",
+        "format-ethernet": "{ipaddr}/{cidr} ",
+        "tooltip-format": "{ifname} via {gwaddr} ",
+        "format-linked": "{ifname} (No IP) ",
+        "format-disconnected": "Disconnected ⚠"
+    },
+    "pulseaudio": {
+        "format": "{volume}% {icon} {format_source}",
+        "format-bluetooth": "{volume}% {icon} {format_source}",
+        "format-muted": " {format_source}",
+        "format-source": "",
+        "format-source-muted": "",
+        "format-icons": {
+            "headphone": "",
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+    "custom/power": {
+        "format" : "⏻",
+        "tooltip": false,
+        "on-click": "wlogout" // 推荐使用 wlogout 替代纯文本菜单
+    },
+	"cpu": {
+    "interval": 2,
+    "format": "{usage}% ",
+    /* 定义状态阈值 */
+    "states": {
+        "warning": 70,   // 当 CPU 使用率超过 70% 时，应用 .warning 样式
+        "critical": 90   // 当 CPU 使用率超过 90% 时，应用 .critical 样式
+    },
+    /* 配合之前的对齐优化 */
+    "min-length": 7,
+    "align": 0.5
+	},
+    "custom/gpu": {
+        "exec": "~/.config/waybar/scripts/gpu-usage.sh",
+        "format": "{}% 󰢮",
+        "return-type": "",
+        "interval": 2,
+		"min-length": 7,
+		"align": 0.5
+    }
+}

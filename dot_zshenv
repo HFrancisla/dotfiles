@@ -1,0 +1,51 @@
+# ==========================================
+# ~/.zshenv
+# Zsh 核心环境变量配置 (全局、非交互式与交互式均加载)
+# ==========================================
+export EDITOR="nvim"
+export VISUAL="nvim"
+
+# --- 1. XDG Base Directory 规范 ---
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+
+# --- 2. Zsh 核心重定向 ---
+# 告诉 Zsh 去哪里找 .zshrc 等配置文件 (极其关键)
+export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+
+# --- 3. 系统基础路径与变量 ---
+# 将个人和本地的 bin 目录放在最前面，优先使用
+export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+
+# WSL 互操作工具路径
+# 仅在 WSL 目录存在时添加，避免影响 Arch 等其他环境
+if [[ -d "/usr/lib/wsl/lib" && ":$PATH:" != *":/usr/lib/wsl/lib:"* ]]; then
+    export PATH="/usr/lib/wsl/lib:$PATH"
+fi
+
+export LANG="en_US.UTF-8"
+export ARCHFLAGS="-arch $(uname -m)"
+
+# --- 4. 工具专属配置文件路径 ---
+export STARSHIP_CONFIG="$XDG_CONFIG_HOME/starship/starship.toml"
+export GDBHISTFILE="$XDG_STATE_HOME/gdb/history"
+export PSQLRC="$XDG_CONFIG_HOME/postgresql/psqlrc"
+export PSQL_HISTORY="$XDG_STATE_HOME/postgresql/psql_history"
+export PSPG_CONF="$XDG_CONFIG_HOME/pspg/pspgconf"
+export IREDIS_CONFIG="$XDG_CONFIG_HOME/iredis/iredisrc"
+# 加载 Rust 环境
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+
+# --- 5. Homebrew (硬编码，避免 eval fork 子进程) ---
+if [ -d "/home/linuxbrew/.linuxbrew" ]; then
+    export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+    export PATH="$HOMEBREW_PREFIX/bin:$HOMEBREW_PREFIX/sbin:$PATH"
+    export PATH="$HOMEBREW_PREFIX/opt/llvm/bin:$PATH"
+    export HOMEBREW_NO_ANALYTICS=1
+    export HOMEBREW_NO_ENV_HINTS=1
+fi
+
+# --- 6. mise (shims 模式) ---
+export PATH="$HOME/.local/share/mise/shims:$PATH"

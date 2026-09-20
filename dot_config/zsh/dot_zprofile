@@ -1,0 +1,6 @@
+# ~/.config/zsh/.zprofile
+
+# 检查当前是否在 tty1 并且环境变量 WAYLAND_DISPLAY 未设置
+if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR:-0}" -eq 1 ]; then
+    exec start-hyprland
+fi

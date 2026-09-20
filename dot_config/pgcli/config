@@ -1,0 +1,149 @@
+# vi: ft=dosini
+# ==========================================
+# pgcli 配置文件
+# 路径: $XDG_CONFIG_HOME/pgcli/config (pgcli 原生支持 XDG，无需额外环境变量)
+# 对照: dot_config/postgresql/psqlrc
+# ==========================================
+
+[main]
+
+# --- 1. 智能补全 (pgcli 独有，psql 无对应) ---
+smart_completion = True
+auto_suggest = True
+wider_completion_menu = False
+always_use_single_connection = False
+
+# --- 2. 多行输入 ---
+# psql 默认多行; pgcli 需要显式开启
+multi_line = True
+multi_line_mode = psql
+
+# --- 3. 破坏性操作保护 (pgcli 独有，比 psql 的 ON_ERROR_ROLLBACK 更主动) ---
+destructive_warning = drop, shutdown, delete, truncate, alter, update, unconditional_update
+destructive_warning_restarts_connection = False
+destructive_statements_require_transaction = False
+
+# --- 4. 输出格式 (对应 psqlrc §1) ---
+# \timing on → timing = True
+timing = True
+
+# \pset null '⟨NULL⟩'
+null_string = '⟨NULL⟩'
+
+# \pset linestyle unicode + \pset border 2
+# pgcli 的 psql 格式底层用 tabulate，已经是 unicode 边框
+table_format = psql
+
+# \x auto → auto_expand (注意: expand 和 auto_expand 是两个独立布尔值)
+expand = False
+auto_expand = True
+
+# \setenv PAGER 'pspg --no-mouse'
+pager = pspg --no-mouse --pgcli-fix
+enable_pager = True
+
+# --- 5. 提示符 (对应 psqlrc §2) ---
+# psql:  %n@%M:%/%R%x%#
+# pgcli: \u=用户 \H=完整主机名 \d=数据库 \T=事务状态(*!/?) \#=角色标识(@/>)
+# 注意: pgcli 没有 %R(连接状态) 的等价物，省略即可
+prompt = '\u@\H:\d\T\# '
+
+# --- 6. 历史记录 (对应 psqlrc §3) ---
+# pgcli 不支持按数据库分离历史文件，统一存储
+# 默认: $XDG_CONFIG_HOME/pgcli/history
+history_file = default
+
+# --- 7. 行为 (对应 psqlrc §4) ---
+# COMP_KEYWORD_CASE upper → keyword_casing = upper
+keyword_casing = upper
+
+# VERBOSITY verbose → verbose_errors = True
+verbose_errors = True
+
+# ON_ERROR_ROLLBACK interactive → 无直接对应
+# pgcli 的 on_error 控制多语句执行流，概念不同
+on_error = STOP
+
+# --- 8. 其余 pgcli 默认值 (保持不动) ---
+auto_retry_closed_connection = True
+generate_aliases = False
+alias_map_file =
+log_file = default
+casing_file = default
+generate_casing_file = False
+case_column_headers = True
+log_level = INFO
+asterisk_column_order = table_order
+qualify_columns = if_more_than_one_table
+search_path_filter = False
+hide_named_query_text = False
+show_bottom_toolbar = True
+syntax_style = native
+vi = False
+row_limit = 1000
+max_field_width = 500
+less_chatty = False
+min_num_menu_lines = 4
+multiline_continuation_char = ''
+keyring = True
+use_local_timezone = True
+
+# --- 9. 颜色方案 (pgcli 默认) ---
+[colors]
+completion-menu.completion.current = 'bg:#ffffff #000000'
+completion-menu.completion = 'bg:#008888 #ffffff'
+completion-menu.meta.completion.current = 'bg:#44aaaa #000000'
+completion-menu.meta.completion = 'bg:#448888 #ffffff'
+completion-menu.multi-column-meta = 'bg:#aaffff #000000'
+scrollbar.arrow = 'bg:#003333'
+scrollbar = 'bg:#00aaaa'
+selected = '#ffffff bg:#6666aa'
+search = '#ffffff bg:#4444aa'
+search.current = '#ffffff bg:#44aa44'
+bottom-toolbar = 'bg:#3a3a5c #c0c0d0'
+bottom-toolbar.off = 'bg:#3a3a5c #7c7c9c'
+bottom-toolbar.on = 'bg:#3a3a5c #b2e0df bold'
+search-toolbar = 'noinherit bold'
+search-toolbar.text = 'nobold'
+system-toolbar = 'noinherit bold'
+arg-toolbar = 'noinherit bold'
+arg-toolbar.text = 'nobold'
+bottom-toolbar.transaction.valid = 'bg:#222222 #00ff5f bold'
+bottom-toolbar.transaction.failed = 'bg:#222222 #ff005f bold'
+output.header = "#00ff5f bold"
+output.odd-row = ""
+output.even-row = ""
+output.null = "#808080"
+
+# Prompt 颜色 (与 starship 的 arrow/os 紫色一致: #c678dd)
+prompt = '#c678dd'
+
+# --- 10. 命名查询 (对应 psqlrc §5 的查询别名) ---
+# psql: 输入 :show_tables 执行
+# pgcli: 输入 \n show_tables 执行  (或 \ns 保存新查询, \nd 删除)
+# ⚠ configobj 陷阱: SQL 含逗号或单引号时必须用 """...""" 包裹，否则会被拆成列表或解析失败
+[named queries]
+show_tables = """SELECT schemaname || '.' || tablename AS full_name, pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) AS size FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC;"""
+show_connections = """SELECT datname, usename, client_addr, state, count(*) AS cnt FROM pg_stat_activity GROUP BY 1,2,3,4 ORDER BY 5 DESC;"""
+show_locks = """SELECT pid, usename, pg_blocking_pids(pid) as blocked_by, query as blocked_query FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0;"""
+
+# --- 11. DSN 别名 (可选，按需添加) ---
+[alias_dsn]
+# local = postgresql://hzf@localhost/mydb
+# staging = postgresql://readonly@staging.example.com/app
+
+# --- 12. 连接时自动执行 ---
+[init-commands]
+
+[alias_dsn.init-commands]
+
+# --- 13. 数字格式 ---
+[data_formats]
+decimal = ""
+float = ""
+
+[column_date_formats]
+
+[ssh tunnels]
+
+[dsn ssh tunnels]

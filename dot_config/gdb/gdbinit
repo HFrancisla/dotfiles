@@ -1,0 +1,154 @@
+# ==========================================
+# ~/.config/gdb/gdbinit
+# GDB 13+ 原生支持 XDG 路径，无需额外环境变量指向此文件
+# ==========================================
+
+# --- 1. 命令历史 ---
+set history save on
+set history size 10000
+set history remove-duplicates unlimited
+set history filename ~/.local/state/gdb/history
+
+# --- 2. 输出与显示 ---
+# 关闭分页，避免调试时被 "press enter" 打断
+set pagination off
+# 打印结构体时每个成员单独一行
+set print pretty on
+# 显示数组索引
+set print array-index on
+# 限制字符串最大显示长度（避免超长输出刷屏）
+set print elements 256
+# 限制嵌套层数
+set print max-depth 5
+# 显示对象真实（动态）类型
+set print object on
+# 显示静态成员
+set print static-members on
+# 打印 demangle 后的 C++ 符号
+set print demangle on
+set print asm-demangle on
+# null 结尾字符串友好显示
+set print null-stop on
+
+# --- 3. 反汇编 ---
+# Intel 语法（比 AT&T 更易读）
+set disassembly-flavor intel
+
+# --- 4. 多线程 ---
+# 调试多线程时仅暂停命中断点的线程，其余继续运行
+# 如需所有线程同步暂停可改为 off
+set non-stop off
+# 打印线程事件（创建 / 退出）
+set print thread-events on
+
+# --- 5. 安全与自动加载 ---
+# 允许当前目录下的 .gdbinit（项目级配置）
+set auto-load local-gdbinit on
+# 允许自动加载 Python/GDB 脚本
+set auto-load python-scripts on
+set auto-load gdb-scripts on
+# 允许调试信息中的安全路径自动加载
+add-auto-load-safe-path /usr
+
+# --- 6. 常用省力设置 ---
+# 退出时不需要确认
+set confirm off
+# 跟踪 fork 后调试子进程（按需切换为 parent）
+set follow-fork-mode child
+set detach-on-fork on
+# 步入时跳过标准库实现细节（GDB 8+）
+skip -gfi /usr/include/c++/*
+skip -gfi /usr/include/x86_64-linux-gnu/c++/*
+
+# --- 7. TUI 与交互 ---
+# 启用命令补全时显示所有候选
+set max-completions 100
+
+# --- 8. Python 增强 ---
+python
+import os, sys
+
+# 自动加载 GCC 附带的 libstdc++ pretty-printer（如果存在）
+_gcc_pp = "/usr/share/gcc/python"
+if os.path.isdir(_gcc_pp) and _gcc_pp not in sys.path:
+    sys.path.insert(0, _gcc_pp)
+
+end
+
+# --- 9. 自定义命令 ---
+
+# 快捷查看当前状态：PC + 反汇编 + 寄存器
+define my_status
+    printf "--- Current PC: %p ---\n", $pc
+    x/5i $pc
+    printf "--- Registers ---\n"
+    info registers
+end
+document my_status
+显示当前 PC 附近指令及全部寄存器
+end
+
+# 快速打印调用栈 + 局部变量
+define btl
+    backtrace full
+end
+document btl
+backtrace full 的缩写
+end
+
+# 断点列表
+define bpl
+    info breakpoints
+end
+document bpl
+列出所有断点
+end
+
+# 线程概览
+define threads
+    info threads
+end
+document threads
+列出所有线程
+end
+
+# 快速 hexdump：用法 xd <addr> <count>
+define xd
+    if $argc == 2
+        x/$arg1xb $arg0
+    else
+        printf "Usage: xd <address> <byte_count>\n"
+    end
+end
+document xd
+十六进制 dump 内存: xd <addr> <count>
+end
+
+# 打印当前函数所有局部变量
+define locals
+    info locals
+end
+document locals
+打印当前栈帧的所有局部变量
+end
+
+# 打印当前函数参数
+define args
+    info args
+end
+document args
+打印当前函数的参数
+end
+
+# 监视表达式变化（自动 watchpoint + continue）
+define wc
+    if $argc == 1
+        watch $arg0
+        continue
+    else
+        printf "Usage: wc <expression>\n"
+    end
+end
+document wc
+设置 watchpoint 后自动 continue: wc <expr>
+end
