@@ -1,0 +1,107 @@
+[user]
+    name  = {{ .name }}
+    email = {{ .email }}
+
+[core]
+    # 指定全局忽略文件位置
+    excludesfile = ~/.config/git/ignore
+
+    # 设置默认编辑器
+    {{- if eq .chezmoi.os "windows" }}
+    editor = code --wait
+    {{- else }}
+    editor = nvim
+    {{- end }}
+
+    autocrlf = input    # 提交时转换为 LF，检出时不转换
+    compression = 9     # 最高压缩率 (CPU 换流量)
+    
+    # fsync = none      # 虽然速度快，但断电可能导致仓库损坏。建议保持默认。
+    whitespace = warn   # 发现行尾空格时给出警告而不是报错
+    pager = diff-so-fancy | less --tabs=4 -RFX
+
+[commit]
+    # 指定模板文件位置
+    template = ~/.config/git/template
+    # 提交时在编辑器下方显示代码差异，有助于写出准确的描述
+    verbose = true
+    # gpgSign = true    # 如果你有 GPG Key，取消注释此行
+
+[advice]
+    addEmptyPathspec = false
+    pushNonFastForward = false
+    statusHints = false
+
+[blame]
+    coloring = highlightRecent
+    date = relative
+
+[diff]
+    context = 3
+    renames = copies    # 检测复制操作
+    interHunkContext = 10
+    
+    # 使用 diff-so-fancy 增强显示 (需先安装: brew install diff-so-fancy)
+    tool = diff-so-fancy
+
+[init]
+    defaultBranch = main
+
+[log]
+    abbrevCommit = true
+    graphColors = blue,yellow,cyan,magenta,green,red
+
+[status]
+    branch = true
+    short = true
+    showStash = true
+    showUntrackedFiles = all
+
+[push]
+    autoSetupRemote = true  # 自动关联远程分支
+    default = simple
+    followTags = true
+
+[pull]
+    rebase = true           # 拉取时使用 Rebase 保持历史整洁
+
+[rebase]
+    autoStash = true        # Rebase 前自动暂存，结束后自动恢复
+
+[credential]
+    {{- if eq .chezmoi.os "windows" }}
+    helper = manager
+    {{- else }}
+    helper = store
+    {{- end }}
+
+
+# --- 颜色与视觉配置 ---
+[color "branch"]
+    current  = magenta
+    local    = default
+    remote   = yellow
+    upstream = green
+    plain    = blue
+
+[color "blame"]
+    highlightRecent = black bold,1 year ago,white,1 month ago,default,7 days ago,blue
+
+[color "diff"]
+    meta       = black bold
+    frag       = magenta
+    context    = white
+    whitespace = yellow reverse
+
+[interactive]
+    diffFilter = diff-so-fancy --patch
+
+[diff-so-fancy]
+    markEmptyLines = false
+
+# --- 实用缩写 (Shortcuts) ---
+[url "git@github.com:"]
+    insteadOf = "gh:"
+
+[url "git@gitlab.com:"]
+    insteadOf = "gl:"
