@@ -14,14 +14,6 @@ Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 | Desktop | Hyprland · Waybar · kanata (Arch only) |
 | Package mgr | Homebrew · pacman/yay |
 
-## Install
-
-```sh
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply HFrancisla/dotfiles
-```
-
-> Prompts for your Git name and email on first run — nothing is hardcoded.
-
 ## Structure
 
 ```
