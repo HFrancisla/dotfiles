@@ -174,7 +174,7 @@ gpall() {
     emulate -L zsh
     setopt local_options no_aliases
 
-    local -a roots=() repos=() disp=() branches=() hints=() parts=()
+    local -a roots=() repos=() disp=() branches=() branch_states=() branch_errors=() hints=() parts=()
     local max_depth=1
 
     while (( $# )); do
@@ -221,13 +221,28 @@ gpall() {
     fi
 
     # ---- 2. 展示名 / 分支 / 列宽（纯本地操作，不走网络）----
-    local p b w=4 bw=6
+    local p b branch_output branch_rc w=4 bw=6
     for p in "${repos[@]}"; do
         if   [[ "$p" == "$base" ]];   then disp+=( "." )
         elif [[ "$p" == "$base"/* ]]; then disp+=( "${p#"$base"/}" )
         else                                disp+=( "$p" ); fi
-        b="$(git -C "$p" symbolic-ref --quiet --short HEAD 2>/dev/null)" || b=""
-        branches+=( "${b:-(detached)}" )
+        branch_output="$(git -C "$p" symbolic-ref --quiet --short HEAD 2>&1)"
+        branch_rc=$?
+        if (( branch_rc == 0 )); then
+            b="$branch_output"
+            branch_states+=( BRANCH )
+            branch_errors+=( '' )
+        elif (( branch_rc == 1 )); then
+            # symbolic-ref exits 1 for a detached HEAD; other failures are not detachment.
+            b="(detached)"
+            branch_states+=( DETACHED )
+            branch_errors+=( '' )
+        else
+            b="(git error)"
+            branch_states+=( ERROR )
+            branch_errors+=( "$branch_output" )
+        fi
+        branches+=( "$b" )
     done
     for p in "${disp[@]}";     do (( ${#p} > w ))  && w=${#p};  done
     for b in "${branches[@]}"; do (( ${#b} > bw )) && bw=${#b}; done
@@ -251,8 +266,11 @@ gpall() {
         branch="${branches[idx]}"
         state='' detail=''
 
-        if [[ "$branch" == "(detached)" ]]; then
+        if [[ "${branch_states[idx]}" == DETACHED ]]; then
             state=SKIP_DETACHED
+        elif [[ "${branch_states[idx]}" == ERROR ]]; then
+            state=FAILED
+            detail="cannot inspect HEAD: ${branch_errors[idx]%%$'\n'*}"
         elif ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
             # 区分「没有配置任何远端」与「有远端但没设 upstream」，否则修复命令会指错方向
             if [[ -z "$(git -C "$repo" remote 2>/dev/null)" ]]; then state=SKIP_NO_REMOTE
@@ -294,8 +312,8 @@ gpall() {
             UPDATED)          (( n_upd += 1 )) ;;
             UPTODATE)         (( n_clean += 1 )) ;;
             SKIP_DIRTY)       (( n_skip += 1 )); hints+=( "${disp[idx]}: 有未提交改动 → git -C '${disp[idx]}' status（处理完可重跑 gpall）" ) ;;
-            SKIP_DETACHED)    (( n_skip += 1 )); hints+=( "${disp[idx]}: 游离 HEAD → git -C '${disp[idx]}' switch main" ) ;;
-            SKIP_NO_UPSTREAM) (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有上游分支 → git -C '${disp[idx]}' branch -u origin/main" ) ;;
+            SKIP_DETACHED)    (( n_skip += 1 )); hints+=( "${disp[idx]}: 游离 HEAD → git -C '${disp[idx]}' log -1 --oneline --decorate，核对提交后再切换到目标分支" ) ;;
+            SKIP_NO_UPSTREAM) (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有上游分支 → git -C '${disp[idx]}' branch -vv，核对远端分支后再设置 upstream" ) ;;
             SKIP_NO_REMOTE)   (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有配置任何远端 → git -C '${disp[idx]}' remote add origin <url>" ) ;;
             DIVERGED)         (( n_fail += 1 )); hints+=( "${disp[idx]}: 与上游分叉 → git -C '${disp[idx]}' log --oneline --left-right --graph '@{u}...HEAD'" ) ;;
             FAILED)           (( n_fail += 1 )); hints+=( "${disp[idx]}: ${detail}" ) ;;
