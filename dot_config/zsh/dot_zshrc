@@ -209,6 +209,11 @@ if command -v starship &> /dev/null; then
     eval "$(starship init zsh)"
 fi
 
+# bun completions
+if [ -n "$ZSH" ] && [ -s "$ZSH/completions/_bun" ]; then
+    source "$ZSH/completions/_bun"
+fi
+
 # -- zsh-syntax-highlighting (MUST BE LAST) --
 if [ -f "$ZSH_SYNTAX_HIGHLIGHTING_FILE" ]; then
     source "$ZSH_SYNTAX_HIGHLIGHTING_FILE"

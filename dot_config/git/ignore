@@ -42,3 +42,9 @@ zig-out/
 # --- Misc ---
 .env
 .env.local
+
+# --- Database Dumps & Sensitive Data ---
+*.dump
+*.sql.gz
+*dump*.sql
+*backup*.sql
