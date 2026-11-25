@@ -337,3 +337,49 @@ gpall() {
     (( n_fail > 0 )) && return 1
     return 0
 }
+
+
+# -------------------- 11. AGY 多账号启动 --------------------
+# 默认自动批准工具权限；Profile 只隔离配置和凭据，不限制文件访问。
+unalias agy agy1 agy2 2>/dev/null || true
+
+agy() {
+    command agy --dangerously-skip-permissions "$@"
+}
+
+_agy_profile() {
+    local profile_name="$1"
+    shift
+    local agy_bin profile_dir
+    agy_bin="$(whence -p agy)" || {
+        print -u2 -- "未找到 AGY，请先安装 agy"
+        return 127
+    }
+    command -v bwrap >/dev/null 2>&1 || {
+        print -u2 -- "未找到 Bubblewrap，请先安装 bubblewrap"
+        return 127
+    }
+    profile_dir="$HOME/.agy-profiles/$profile_name/.gemini"
+
+    (
+        umask 077
+        mkdir -p -- "$profile_dir" "$HOME/.gemini" || exit 1
+        unset GEMINI_HOME GEMINI_API_KEY AGY_ADC_AUTH
+
+        command bwrap \
+            --bind / / \
+            --dev-bind /dev /dev \
+            --bind "$profile_dir" "$HOME/.gemini" \
+            --unsetenv DBUS_SESSION_BUS_ADDRESS \
+            --chdir "$PWD" \
+            -- "$agy_bin" --dangerously-skip-permissions "$@"
+    )
+}
+
+agy1() {
+    _agy_profile account1 "$@"
+}
+
+agy2() {
+    _agy_profile account2 "$@"
+}

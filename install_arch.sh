@@ -64,7 +64,7 @@ install_prerequisites() {
 	sudo pacman -Syu --noconfirm
 
 	local missing=()
-	for pkg in git curl zsh base-devel bind strace ltrace bpftrace bcc-tools; do
+	for pkg in git curl zsh base-devel bind strace ltrace bpftrace bcc-tools bubblewrap; do
 		if ! pacman -Qi "$pkg" &>/dev/null; then
 			missing+=("$pkg")
 		fi

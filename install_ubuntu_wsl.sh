@@ -61,7 +61,7 @@ install_prerequisites() {
 	step "检查基础依赖 (git, curl, zsh, build-essential)"
 
 	local missing=()
-	for pkg in git curl zsh build-essential procps file dnsutils strace ltrace bpftrace bpfcc-tools; do
+	for pkg in git curl zsh build-essential procps file dnsutils strace ltrace bpftrace bpfcc-tools bubblewrap; do
 		if ! dpkg -s "$pkg" &>/dev/null; then
 			missing+=("$pkg")
 		fi
