@@ -49,3 +49,6 @@ fi
 
 # --- 6. mise (shims 模式) ---
 export PATH="$HOME/.local/share/mise/shims:$PATH"
+
+# --- 默认文件与目录创建权限 ---
+umask 022
