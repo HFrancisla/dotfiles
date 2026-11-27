@@ -1,12 +1,27 @@
 [tools]
-# Node.js - 使用最新 LTS 版本
+# 语言运行时
 node = "lts"
-
-# Lua - Neovim 需要 5.1 兼容
 lua = "5.1"
 python = "3.13"
 java = "temurin-21"
+go = "latest"
+
+# 开发工具（独立管理，不安装到 Node.js 的全局 npm 目录）
+pnpm = "latest"
+tree-sitter = "latest"
+"npm:neovim" = "latest"
+"npm:@mermaid-js/mermaid-cli" = "latest"
+
+# AI CLI
+opencode = "latest"
+"npm:@earendil-works/pi-coding-agent" = "latest"
+"npm:@voyager-crew/cli" = "latest"
+"npm:@getpaseo/cli" = "latest"
 
 [settings]
-# 进入包含 .mise.toml / .tool-versions 的目录时自动安装缺失的工具
+# 不自动安装项目中缺失的工具
 auto_install = false
+
+[settings.npm]
+# 使用 npm 安装后端，避免 aube 下载时的 TLS 连接中断
+package_manager = "npm"

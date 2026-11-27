@@ -213,7 +213,7 @@ install_packages() {
 
 # -------------------- 初始化 mise 运行时 --------------------
 setup_mise() {
-	step "初始化 mise 运行时环境"
+	step "初始化 mise 运行时和 CLI 工具"
 
 	if ! command -v mise &>/dev/null; then
 		warn "mise 未安装，跳过运行时初始化"
@@ -227,21 +227,13 @@ setup_mise() {
 	export MISE_NODE_VERIFY=false
 
 	# 信任全局配置并安装所有配置的运行时
-	info "安装 mise 配置的运行时 (Node, Lua, Python...)..."
+	info "安装 mise 配置的运行时和 CLI 工具..."
 	mise trust --all 2>/dev/null || true
-	mise install --yes || warn "部分运行时安装可能未成功"
+	mise install --yes || warn "部分 mise 工具安装可能未成功"
 	mise reshim || true
 
-	# 启用 corepack (Node.js 内置，管理 pnpm/yarn)
-	if command -v corepack &>/dev/null; then
-		info "启用 corepack (pnpm, yarn)..."
-		corepack enable 2>/dev/null || true
-		success "corepack 已启用"
-	else
-		warn "corepack 未找到，可能 Node.js 尚未安装完成"
-	fi
 
-	success "mise 运行时环境初始化完成"
+	success "mise 工具环境初始化完成"
 }
 
 # -------------------- 安装 Rustup --------------------

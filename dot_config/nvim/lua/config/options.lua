@@ -58,3 +58,11 @@ vim.g.loaded_ruby_provider = 0
 
 -- Python 虚拟环境路径
 vim.g.python3_host_prog = vim.fn.expand("~/.virtualenvs/nvim-python/bin/python")
+
+-- Node.js provider：Neovim 通过 node 执行入口脚本，不能使用 mise 的 shim。
+if vim.fn.executable("mise") == 1 then
+  local host = vim.fn.trim(vim.fn.system({ "mise", "which", "neovim-node-host" }))
+  if vim.v.shell_error == 0 and vim.fn.filereadable(host) == 1 then
+    vim.g.node_host_prog = host
+  end
+end
