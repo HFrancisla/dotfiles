@@ -17,7 +17,6 @@
     compression = 9     # 最高压缩率 (CPU 换流量)
     
     # fsync = none      # 虽然速度快，但断电可能导致仓库损坏。建议保持默认。
-    whitespace = warn   # 发现行尾空格时给出警告而不是报错
     pager = diff-so-fancy | less --tabs=4 -RFX
 
 [commit]
@@ -40,9 +39,6 @@
     context = 3
     renames = copies    # 检测复制操作
     interHunkContext = 10
-    
-    # 使用 diff-so-fancy 增强显示 (需先安装: brew install diff-so-fancy)
-    tool = diff-so-fancy
 
 [init]
     defaultBranch = main

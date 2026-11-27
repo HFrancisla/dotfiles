@@ -34,7 +34,7 @@
 -- 使用方式: 输入 :别名名 回车执行
 -- 需要 pg_stat_statements 扩展:
 -- \set show_slow_queries 'SELECT (total_exec_time / 1000 / 60) as total_min, mean_exec_time as avg_ms, calls, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 20;'
-\set show_tables 'SELECT schemaname || ''.'' || tablename AS full_name, pg_size_pretty(pg_total_relation_size(schemaname || ''.'' || tablename)) AS size FROM pg_tables WHERE schemaname NOT IN (''pg_catalog'', ''information_schema'') ORDER BY pg_total_relation_size(schemaname || ''.'' || tablename) DESC;'
+\set show_tables 'SELECT format(''%I.%I'', schemaname, tablename) AS full_name, pg_size_pretty(pg_total_relation_size(format(''%I.%I'', schemaname, tablename)::regclass)) AS size FROM pg_tables WHERE schemaname NOT IN (''pg_catalog'', ''information_schema'') ORDER BY pg_total_relation_size(format(''%I.%I'', schemaname, tablename)::regclass) DESC;'
 \set show_connections 'SELECT datname, usename, client_addr, state, count(*) AS cnt FROM pg_stat_activity GROUP BY 1,2,3,4 ORDER BY 5 DESC;'
 \set show_locks 'SELECT pid, usename, pg_blocking_pids(pid) as blocked_by, query as blocked_query FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0;'
 

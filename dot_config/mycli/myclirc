@@ -133,7 +133,9 @@ prompt = '#c678dd'
 [favorite_queries]
 show_tables = """SELECT table_schema AS tbl_schema, table_name AS tbl_name, CONCAT(ROUND(((data_length + index_length) / 1024 / 1024), 2), ' MB') AS size FROM information_schema.TABLES WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys') ORDER BY (data_length + index_length) DESC;"""
 show_connections = """SELECT user, host, db, command, time, state, LEFT(info, 80) AS query FROM information_schema.PROCESSLIST ORDER BY time DESC;"""
-show_locks = """SELECT r.trx_id AS waiting_trx_id, r.trx_mysql_thread_id AS waiting_pid, r.trx_query AS waiting_query, b.trx_id AS blocking_trx_id, b.trx_mysql_thread_id AS blocking_pid, b.trx_query AS blocking_query FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_TRX b ON b.trx_id = w.blocking_trx_id JOIN information_schema.INNODB_TRX r ON r.trx_id = w.requesting_trx_id;"""
+# 使用 INNODB_TRX 的 LOCK WAIT 状态，兼容 MySQL 8 与 MariaDB；
+# 不依赖 MySQL 8 已移除的 information_schema.INNODB_LOCK_WAITS。
+show_locks = """SELECT trx_id, trx_mysql_thread_id AS pid, trx_state, trx_started, trx_wait_started, trx_query FROM information_schema.INNODB_TRX WHERE trx_state = 'LOCK WAIT' ORDER BY trx_wait_started;"""
 
 # --- 11. DSN 别名 (对应 pgcli §11, 按需添加) ---
 [alias_dsn]

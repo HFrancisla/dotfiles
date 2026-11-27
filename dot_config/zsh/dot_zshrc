@@ -94,21 +94,6 @@ if [ -f "$ZSH_AUTOSUGGESTIONS_FILE" ]; then
     source "$ZSH_AUTOSUGGESTIONS_FILE"
 fi
 
-## 放在 source zsh-vi-mode 之前
-#function zvm_config() {
-#    ZVM_VI_INSERT_ESCAPE_BINDKEY=jf
-#    ZVM_SYSTEM_CLIPBOARD_ENABLED=true
-#}
-#
-#function zvm_after_init(){
-#    source <(fzf --zsh)
-#}
-#
-## -- zsh-vi-mode --
-#if [ -f "$ZSH_VI_MODE_FILE" ]; then
-#    source "$ZSH_VI_MODE_FILE"
-#fi
-
 # -------------------- 3. 自定义配置 (User Configuration) --------------------
 unsetopt beep
 bindkey -e  # 强制 emacs 键绑定，防止 EDITOR=nvim 自动触发 vi 模式
@@ -142,9 +127,10 @@ rfv() {
 
 # yazi 集成
 y() {
-    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
-    yazi "$@" --cwd-file="$tmp"
-    if local cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+    command yazi "$@" --cwd-file="$tmp"
+    if IFS= read -r -d '' cwd < "$tmp" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && [ -d "$cwd" ]; then
         builtin cd -- "$cwd"
     fi
     command rm -f -- "$tmp"
@@ -207,11 +193,6 @@ fi
 # starship
 if command -v starship &> /dev/null; then
     eval "$(starship init zsh)"
-fi
-
-# bun completions
-if [ -n "$ZSH" ] && [ -s "$ZSH/completions/_bun" ]; then
-    source "$ZSH/completions/_bun"
 fi
 
 # -- zsh-syntax-highlighting (MUST BE LAST) --

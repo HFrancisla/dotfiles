@@ -31,7 +31,12 @@ if [ "$(id -u)" = "0" ]; then
 fi
 
 if ! command -v yay &>/dev/null; then
-	error "未找到 yay！请先运行 install.sh 安装基础环境及其依赖。"
+	error "未找到 yay！请先运行 install_arch.sh 安装基础环境及其依赖。"
+	exit 1
+fi
+
+if [ ! -f "$HOME/.config/hypr/hyprland.lua" ]; then
+	error "未找到 ~/.config/hypr/hyprland.lua；请先运行 install_arch.sh 应用 dotfiles。"
 	exit 1
 fi
 
@@ -49,6 +54,7 @@ HYPR_CORE=(
 	waybar                      # 状态栏
 	hypridle                    # 空闲管理 (锁屏/息屏逻辑)
 	hyprlock                    # 现代锁屏
+	pciutils                    # lspci: GPU 检测与 Waybar GPU 脚本依赖
 	polkit-gnome                # GUI 提权认证弹窗
 	xdg-desktop-portal-hyprland # Hyprland XDG Portal (屏幕共享/文件选择)
 	xdg-desktop-portal-gtk      # GTK 文件选择对话框 Portal 后端
@@ -138,12 +144,19 @@ else
 	step "开始通过 yay 安装 ${#to_install[@]} 个缺失的桌面级程序包..."
 
 	# 使用 --needed 避免重复安装，--noconfirm 自动确认
-	yay -S --needed --noconfirm "${to_install[@]}" || {
+	if ! yay -S --needed --noconfirm "${to_install[@]}"; then
 		warn "部分包可能在批量安装时遇到问题，尝试逐个安装回退..."
+		failed=()
 		for pkg in "${to_install[@]}"; do
-			yay -S --needed --noconfirm "$pkg" || warn "安装失败: $pkg (请稍后手动检查)"
+			if ! yay -S --needed --noconfirm "$pkg"; then
+				failed+=("$pkg")
+			fi
 		done
-	}
+		if [ ${#failed[@]} -gt 0 ]; then
+			error "以下桌面包安装失败: ${failed[*]}"
+			exit 1
+		fi
+	fi
 fi
 
 success "桌面级程序安装阶段完成！"
@@ -151,19 +164,32 @@ success "桌面级程序安装阶段完成！"
 # -------------------- 检测 GPU 并安装对应驱动 + 生成本地配置 --------------------
 step "检测 GPU 类型并配置驱动..."
 
-LOCAL_CONF="$HOME/.config/hypr/local.conf"
+LOCAL_CONF="$HOME/.config/hypr/local.lua"
 mkdir -p "$(dirname "$LOCAL_CONF")"
 
 # 初始化本地配置文件
 cat >"$LOCAL_CONF" <<'HEADER'
-# ==========================================
-# Hyprland 机器本地配置 (自动生成)
-# 由 install_desktop.sh 根据当前硬件自动检测并生成
-# 请勿手动编辑此文件，重新运行 install_desktop.sh 将覆盖
-# ==========================================
+-- ==========================================
+-- Hyprland 机器本地配置 (自动生成)
+-- 由 install_desktop_arch.sh 根据当前硬件自动检测并生成
+-- 请勿手动编辑此文件，重新运行 install_desktop_arch.sh 将覆盖
+-- ==========================================
 HEADER
 
-GPU_DETECTED=false
+GPU_INFO=$(lspci)
+HAS_INTEL=false
+HAS_AMD=false
+HAS_NVIDIA=false
+
+if grep -qiE 'VGA.*Intel|Display.*Intel|3D.*Intel' <<<"$GPU_INFO"; then
+	HAS_INTEL=true
+fi
+if grep -qiE 'VGA.*AMD|Display.*AMD|3D.*AMD' <<<"$GPU_INFO"; then
+	HAS_AMD=true
+fi
+if grep -qiE 'VGA.*NVIDIA|Display.*NVIDIA|3D.*NVIDIA' <<<"$GPU_INFO"; then
+	HAS_NVIDIA=true
+fi
 
 # 辅助函数：过滤已安装的 GPU 相关包
 install_gpu_packages() {
@@ -174,70 +200,121 @@ install_gpu_packages() {
 		fi
 	done
 	if [ ${#missing[@]} -gt 0 ]; then
-		yay -S --needed --noconfirm "${missing[@]}" || warn "驱动包安装失败: ${missing[*]}"
+		if ! yay -S --needed --noconfirm "${missing[@]}"; then
+			error "驱动包安装失败: ${missing[*]}"
+			return 1
+		fi
 	fi
 }
 
 # --- Intel 核显 ---
-if lspci | grep -qiE 'VGA.*Intel|Display.*Intel|3D.*Intel'; then
+if $HAS_INTEL; then
 	info "检测到 Intel 核显，安装 VA-API iHD 驱动..."
 	install_gpu_packages intel-media-driver
-	echo "" >>"$LOCAL_CONF"
-	echo "# Intel 核显 VA-API 驱动" >>"$LOCAL_CONF"
-	echo "env = LIBVA_DRIVER_NAME,iHD" >>"$LOCAL_CONF"
-	GPU_DETECTED=true
 	success "Intel GPU 驱动配置完成。"
 fi
 
 # --- AMD 独显/核显 ---
-if lspci | grep -qiE 'VGA.*AMD|Display.*AMD|3D.*AMD'; then
+if $HAS_AMD; then
 	info "检测到 AMD 显卡，安装 VA-API 驱动..."
 	install_gpu_packages libva-mesa-driver mesa-vdpau
-	echo "" >>"$LOCAL_CONF"
-	echo "# AMD 显卡 VA-API 驱动 (radeonsi)" >>"$LOCAL_CONF"
-	echo "env = LIBVA_DRIVER_NAME,radeonsi" >>"$LOCAL_CONF"
-	GPU_DETECTED=true
 	success "AMD GPU 驱动配置完成。"
 fi
 
 # --- NVIDIA 独显 ---
-if lspci | grep -qiE 'VGA.*NVIDIA|Display.*NVIDIA|3D.*NVIDIA'; then
+if $HAS_NVIDIA; then
 	info "检测到 NVIDIA 显卡，清理可能引起冲突的遗留包..."
 	sudo pacman -Rdd --noconfirm libva-nvidia-driver-git 2>/dev/null || true
 	info "安装 NVIDIA 驱动与 VA-API 兼容层..."
-	install_gpu_packages linux-headers nvidia-open-dkms nvidia-utils libva-nvidia-driver
-
-	echo "" >>"$LOCAL_CONF"
-	echo "# NVIDIA 显卡 Hyprland 优化" >>"$LOCAL_CONF"
-	# 如果已经检测到 Intel，默认 VA-API 还是用 Intel (iHD) 比较稳，NVIDIA 仅用于渲染
-	if ! lspci | grep -qiE 'VGA.*Intel|Display.*Intel|3D.*Intel'; then
-		echo "env = LIBVA_DRIVER_NAME,nvidia" >>"$LOCAL_CONF"
+	kernel_pkg=$(pacman -Qoq "/usr/lib/modules/$(uname -r)" 2>/dev/null | head -n 1 || true)
+	if [ -n "$kernel_pkg" ] && pacman -Si "${kernel_pkg}-headers" &>/dev/null; then
+		install_gpu_packages "${kernel_pkg}-headers"
 	else
-		echo "# 检测到混合显卡，默认维持 Intel Va-api (iHD)，如需硬解切到 NVIDIA 请修改下方" >>"$LOCAL_CONF"
-		echo "# env = LIBVA_DRIVER_NAME,nvidia" >>"$LOCAL_CONF"
+		error "无法自动确定当前内核对应的 headers 包，停止安装 NVIDIA DKMS 驱动"
+		exit 1
 	fi
-	echo "env = GBM_BACKEND,nvidia-drm" >>"$LOCAL_CONF"
-	echo "env = __GLX_VENDOR_LIBRARY_NAME,nvidia" >>"$LOCAL_CONF"
-	echo "env = __NV_PRIME_RENDER_OFFLOAD,1" >>"$LOCAL_CONF"
-	GPU_DETECTED=true
+	install_gpu_packages nvidia-open-dkms nvidia-utils libva-nvidia-driver
 	success "NVIDIA GPU 驱动配置完成。"
 fi
 
-if ! $GPU_DETECTED; then
+# 统一生成 VA-API / NVIDIA 环境变量，避免多 GPU 分支互相覆盖。
+if $HAS_AMD; then
+	{
+		echo ""
+		echo "-- AMD/混合显卡：优先 Mesa radeonsi VA-API"
+		echo 'hl.env("LIBVA_DRIVER_NAME", "radeonsi")'
+	} >>"$LOCAL_CONF"
+elif $HAS_INTEL; then
+	{
+		echo ""
+		echo "-- Intel/混合显卡：优先 Intel iHD VA-API"
+		echo 'hl.env("LIBVA_DRIVER_NAME", "iHD")'
+	} >>"$LOCAL_CONF"
+elif $HAS_NVIDIA; then
+	{
+		echo ""
+		echo "-- 纯 NVIDIA：启用 NVIDIA VA-API/GLX"
+		echo 'hl.env("LIBVA_DRIVER_NAME", "nvidia")'
+		echo 'hl.env("NVD_BACKEND", "direct")'
+		echo 'hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")'
+	} >>"$LOCAL_CONF"
+fi
+
+if $HAS_NVIDIA && { $HAS_INTEL || $HAS_AMD; }; then
+	{
+		echo ""
+		echo "-- NVIDIA 混合显卡：不设置全局 GBM/GLX 强制变量，由 Hyprland/应用自行选择 GPU。"
+	} >>"$LOCAL_CONF"
+fi
+
+if ! $HAS_INTEL && ! $HAS_AMD && ! $HAS_NVIDIA; then
 	info "未检测到已知 GPU 类型 (Intel/AMD/NVIDIA)，跳过驱动安装。"
-	echo "" >>"$LOCAL_CONF"
-	echo "# 未检测到特定 GPU，无需额外配置" >>"$LOCAL_CONF"
+	{
+		echo ""
+		echo "-- 未检测到特定 GPU，无需额外配置"
+	} >>"$LOCAL_CONF"
 fi
 
 success "GPU 检测与本地配置生成完成: $LOCAL_CONF"
 
 # -------------------- 检查音频服务 --------------------
 step "检查并激活 Pipewire 音频服务"
-systemctl --user enable --now pipewire.service pipewire-pulse.service wireplumber.service || true
+systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service
 success "音频服务配置完成。"
 
-# -------------------- Fcitx5 环境变量提示 --------------------
-step "环境检查结束"
+# -------------------- 最终验证 --------------------
+step "验证桌面环境"
+
+DESKTOP_COMMANDS=(
+	Hyprland start-hyprland waybar hypridle hyprlock
+	anyrun grimblast wtype mako wlogout grim slurp wl-copy cliphist
+	kitty thunar clash-verge
+	wpctl pavucontrol playerctl brightnessctl fcitx5
+)
+
+missing_commands=()
+for cmd in "${DESKTOP_COMMANDS[@]}"; do
+	if ! command -v "$cmd" &>/dev/null; then
+		missing_commands+=("$cmd")
+	fi
+done
+
+if [ ${#missing_commands[@]} -gt 0 ]; then
+	error "以下桌面命令未检测到: ${missing_commands[*]}"
+	exit 1
+fi
+
+if [ ! -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
+	error "polkit-gnome authentication agent 未找到"
+	exit 1
+fi
+
+if ! Hyprland --verify-config -c "$HOME/.config/hypr/hyprland.lua"; then
+	error "Hyprland 配置验证失败"
+	exit 1
+fi
+
+success "Hyprland 配置与桌面命令验证通过。"
 
 echo ""
 echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"

@@ -64,7 +64,7 @@ install_prerequisites() {
 	sudo pacman -Syu --noconfirm
 
 	local missing=()
-	for pkg in git curl zsh base-devel bind strace ltrace bpftrace bcc-tools bubblewrap; do
+	for pkg in git curl zsh base-devel bind strace ltrace bpftrace bcc-tools bubblewrap less unzip; do
 		if ! pacman -Qi "$pkg" &>/dev/null; then
 			missing+=("$pkg")
 		fi
@@ -142,12 +142,15 @@ install_packages() {
 
 	# ---- 4. 开发工具 ----
 	local DEV_PACKAGES=(
-		llvm          # 编译工具链 (.zshrc 中配置了 PATH)
-		mise          # 多语言版本管理 (Node/Lua/Python/Java/Rust)
+		llvm          # LLVM 基础工具链
+		clang         # C/C++ 编译器
+		mise          # 多语言版本管理 (Node/Lua/Python/Java/Go + CLI)
 		luarocks      # Lua 包管理器
 		lua-luarocks  # Lua 5.5 库文件 (luarocks 拆包后需要显式安装)
+		gdb            # 调试器 (配置由 dotfiles 管理)
 		github-cli    # GitHub CLI (Arch 包名)
 		lazygit       # Git TUI (LazyVim 集成)
+		serpl         # 项目级搜索替换 TUI (tmux 快捷键依赖)
 		jq            # JSON 处理
 		yq            # YAML/XML/TOML 处理
 		dasel         # 多格式数据查询/修改 (JSON/YAML/TOML/CSV/XML)
@@ -160,7 +163,16 @@ install_packages() {
 		trivy         # Docker 镜像漏洞扫描
 	)
 
-	# ---- 5. 文件预览依赖 (Yazi) ----
+	# ---- 5. 数据库客户端 ----
+	local DB_PACKAGES=(
+		postgresql-libs # psql 与 PostgreSQL 客户端工具
+		pgcli           # PostgreSQL 交互客户端
+		mycli           # MySQL 交互客户端
+		iredis          # Redis 交互客户端
+		pspg            # 表格 pager
+	)
+
+	# ---- 6. 文件预览依赖 (Yazi) ----
 	local PREVIEW_PACKAGES=(
 		ffmpeg      # 视频预览/处理
 		imagemagick # 图片预览/处理
@@ -168,10 +180,10 @@ install_packages() {
 		glow        # Markdown 渲染 (Yazi glow 插件依赖)
 	)
 
-	# ---- 6. 实用工具 ----
+	# ---- 7. 实用工具 ----
 	local UTIL_PACKAGES=(
 		dos2unix # 行尾转换 (WSL 常用)
-		pandoc   # 文档格式转换
+		pandoc-cli # 文档格式转换
 		pv       # 管道进度查看器
 	)
 
@@ -181,6 +193,7 @@ install_packages() {
 		"${MODERN_CLI_PACKAGES[@]}"
 		"${MONITOR_PACKAGES[@]}"
 		"${DEV_PACKAGES[@]}"
+		"${DB_PACKAGES[@]}"
 		"${PREVIEW_PACKAGES[@]}"
 		"${UTIL_PACKAGES[@]}"
 		7zip # Arch 包名
@@ -197,26 +210,43 @@ install_packages() {
 		info "所有核心工具包已是最新，跳过安装"
 	else
 		info "使用 yay 安装 ${#to_install[@]} 个缺失的包..."
-		yay -S --needed --noconfirm "${to_install[@]}" || {
+		if ! yay -S --needed --noconfirm "${to_install[@]}"; then
 			warn "部分包可能安装失败，尝试逐个安装..."
+			local failed=()
 			for pkg in "${to_install[@]}"; do
-				yay -S --needed --noconfirm "$pkg" || warn "跳过: $pkg"
+				if ! yay -S --needed --noconfirm "$pkg"; then
+					failed+=("$pkg")
+				fi
 			done
-		}
+			if [ ${#failed[@]} -gt 0 ]; then
+				error "以下核心包安装失败: ${failed[*]}"
+				return 1
+			fi
+		fi
 	fi
 
 	success "核心工具包安装完成"
 }
 
-# -------------------- 初始化 Hyprland local.conf --------------------
-setup_hyprland_local_conf() {
+# -------------------- 初始化 Hyprland local.lua --------------------
+setup_hyprland_local_lua() {
 	step "初始化 Hyprland local 配置占位文件"
 
 	local HYPR_DIR="$HOME/.config/hypr"
 	mkdir -p "$HYPR_DIR"
-	touch "$HYPR_DIR/local.conf"
+	touch "$HYPR_DIR/local.lua"
 
-	success "Hyprland local.conf 已就绪"
+	success "Hyprland local.lua 已就绪"
+}
+
+# -------------------- 准备运行时目录 --------------------
+setup_runtime_dirs() {
+	step "准备运行时目录"
+
+	mkdir -p "$HOME/.local/state/gdb" "$HOME/.local/state/postgresql" "$HOME/.ssh/sockets"
+	chmod 700 "$HOME/.ssh" "$HOME/.ssh/sockets"
+
+	success "运行时目录已就绪"
 }
 
 # -------------------- 初始化 mise 运行时 --------------------
@@ -224,18 +254,20 @@ setup_mise() {
 	step "初始化 mise 运行时和 CLI 工具"
 
 	if ! command -v mise &>/dev/null; then
-		warn "mise 未安装，跳过运行时初始化"
-		return 0
+		error "mise 未安装，无法初始化运行时和 CLI 工具"
+		return 1
 	fi
 
-	# 激活 mise 到当前 shell (install.sh 是 bash)
+	# 激活 mise 到当前 bootstrap Bash 进程。
 	eval "$(mise activate bash)"
 
-	# 信任全局配置并安装所有配置的运行时
+	# 全局配置只有静态 tools/settings，不需要 trust；直接安装所有配置工具。
 	info "安装 mise 配置的运行时和 CLI 工具..."
-	mise trust --all 2>/dev/null || true
-	mise install --yes || warn "部分 mise 工具安装可能未成功"
-	mise reshim || true
+	if ! mise install --yes; then
+		error "mise 工具安装失败"
+		return 1
+	fi
+	mise reshim
 
 
 	success "mise 工具环境初始化完成"
@@ -259,12 +291,13 @@ install_rustup() {
 
 	# 动态加载环境变量以便当前脚本后续命令可用
 	if [ -f "$CARGO_ENV" ]; then
+		# shellcheck source=/dev/null
 		source "$CARGO_ENV"
 	fi
 
 	if command -v rustup &>/dev/null; then
 		info "确保核心组件已安装 (clippy, rust-analyzer)..."
-		rustup component add clippy rust-analyzer 2>/dev/null || warn "Rust 组件安装可能未完全成功"
+		rustup component add clippy rust-analyzer
 	fi
 }
 
@@ -277,8 +310,8 @@ setup_neovim_providers() {
 	local NVIM_VENV="$HOME/.virtualenvs/nvim-python"
 
 	if ! command -v uv &>/dev/null; then
-		warn "uv 未安装，跳过 Python 虚拟环境配置"
-		return 0
+		error "uv 未安装，无法配置 Neovim Python provider"
+		return 1
 	fi
 
 	info "使用 uv 创建 Neovim 专属 Python 虚拟环境: $NVIM_VENV"
@@ -331,7 +364,7 @@ install_zsh_plugins() {
 
 	if [ ${#to_install[@]} -gt 0 ]; then
 		info "使用 yay 安装 ${#to_install[@]} 个缺失的 Zsh 插件..."
-		yay -S --needed --noconfirm "${to_install[@]}" || true
+		yay -S --needed --noconfirm "${to_install[@]}"
 	else
 		info "所有 Zsh 插件均已安装，跳过"
 	fi
@@ -355,12 +388,14 @@ install_zsh_plugins() {
 install_tpm() {
 	step "检查 Tmux Plugin Manager (TPM)"
 
-	local TPM_DIR="$HOME/.tmux/plugins/tpm"
+	local TPM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/plugins/tpm"
 
-	if [ -d "$TPM_DIR" ]; then
+	if [ -x "$TPM_DIR/tpm" ]; then
 		info "TPM 已安装"
 	else
 		info "正在安装 TPM..."
+		rm -rf "$TPM_DIR"
+		mkdir -p "$(dirname "$TPM_DIR")"
 		git clone --depth 1 https://github.com/tmux-plugins/tpm "$TPM_DIR"
 		success "TPM 安装完成"
 	fi
@@ -379,7 +414,8 @@ apply_dotfiles() {
 
 		# 如果存在非 Git 目录，先备份以防冲突
 		if [ -d "$CHEZMOI_SOURCE" ]; then
-			local backup_name="${CHEZMOI_SOURCE}.bak.$(date +%Y%m%d%H%M%S)"
+			local backup_name
+			backup_name="${CHEZMOI_SOURCE}.bak.$(date +%Y%m%d%H%M%S)"
 			warn "发现已存在的非 Git 目录，正在备份到: $backup_name"
 			mv "$CHEZMOI_SOURCE" "$backup_name"
 		fi
@@ -399,7 +435,11 @@ apply_dotfiles() {
 
 	info "应用 dotfiles (diff 预览)..."
 	local diff_output
-	diff_output=$(chezmoi diff 2>&1) || true
+	if ! diff_output=$(chezmoi diff 2>&1); then
+		error "chezmoi diff 失败，停止部署以避免基于无效配置继续执行"
+		echo "$diff_output" >&2
+		return 1
+	fi
 
 	if [ -z "$diff_output" ]; then
 		info "没有检测到差异 (当前配置已经是最新的)"
@@ -416,7 +456,8 @@ apply_dotfiles() {
 			chezmoi apply -v
 			success "Dotfiles 已成功应用"
 		else
-			warn "已跳过 dotfiles 应用，你可以稍后执行: chezmoi apply"
+			error "已取消 dotfiles 应用；后续步骤依赖已应用的配置，因此停止部署"
+			return 1
 		fi
 	fi
 }
@@ -426,13 +467,12 @@ install_yazi_plugins() {
 	step "安装 Yazi 插件"
 
 	if ! command -v ya &>/dev/null; then
-		warn "ya 命令未找到，跳过 Yazi 插件安装"
-		warn "提示: 请确保 yazi 已正确安装，然后手动执行: ya pkg install"
-		return 0
+		error "ya 命令未找到，无法安装 Yazi 插件"
+		return 1
 	fi
 
 	info "正在安装 Yazi 插件包..."
-	ya pkg install || warn "Yazi 插件安装可能未完全成功"
+	ya pkg install
 
 	success "Yazi 插件安装完成"
 }
@@ -444,10 +484,7 @@ setup_kanata() {
 	# 1. 安装 kanata-bin
 	if ! pacman -Qi kanata-bin &>/dev/null; then
 		info "使用 yay 安装 kanata-bin..."
-		yay -S --needed --noconfirm kanata-bin || {
-			warn "kanata-bin 安装失败，请手动检查"
-			return 0
-		}
+		yay -S --needed --noconfirm kanata-bin
 		success "kanata-bin 安装完成"
 	else
 		info "kanata-bin 已安装"
@@ -507,9 +544,8 @@ setup_kanata() {
 			warn "Kanata 服务启动失败 (可能需要重新登录以生效用户组权限)"
 		success "Kanata systemd 服务已启用 (开机自启)"
 	else
-		warn "Kanata systemd 服务文件不存在: $SERVICE_FILE"
-		warn "请先确认 chezmoi apply 已执行，然后手动运行:"
-		warn "  systemctl --user daemon-reload && systemctl --user enable --now kanata.service"
+		error "Kanata systemd 服务文件不存在: $SERVICE_FILE"
+		return 1
 	fi
 
 	success "Kanata 键盘映射配置完成"
@@ -551,15 +587,15 @@ set_default_shell() {
 install_tmux_plugins() {
 	step "安装 Tmux 插件"
 
-	local TPM_DIR="$HOME/.tmux/plugins/tpm"
+	local TPM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/plugins/tpm"
 
 	if [ ! -x "$TPM_DIR/bin/install_plugins" ]; then
-		warn "TPM 安装脚本未找到，跳过"
-		return 0
+		error "TPM 安装脚本未找到: $TPM_DIR/bin/install_plugins"
+		return 1
 	fi
 
 	info "正在安装 Tmux 插件..."
-	"$TPM_DIR/bin/install_plugins" || warn "部分 Tmux 插件安装可能未成功"
+	"$TPM_DIR/bin/install_plugins"
 
 	success "Tmux 插件安装完成"
 }
@@ -571,11 +607,17 @@ post_install_check() {
 	local all_ok=true
 	local tools=(
 		chezmoi git zsh nvim tmux
-		starship fastfetch btop fzf
+		starship fastfetch btop htop btm fzf
 		eza zoxide fd bat rg sd
 		dust duf procs gping tldr
-		diff-so-fancy delta yazi lazygit jq yq dasel xmlstarlet gh
-		ffmpeg pandoc
+		diff-so-fancy delta yazi lazygit serpl jq yq dasel xmlstarlet gh
+		gdu ncdu bandwhich trip mtr progress
+		clang luarocks sqlite3 uv dive trivy
+		ffmpeg pdftotext glow pandoc dos2unix pv less unzip
+		gdb psql pgcli mycli iredis pspg
+		mise node npm pnpm tree-sitter lua python3 java go
+		neovim-node-host mmdc opencode pi voyager paseo
+		rustup cargo rustc clippy-driver rust-analyzer
 		kanata
 	)
 
@@ -620,7 +662,8 @@ post_install_check() {
 	if $all_ok; then
 		success "所有工具已就绪！"
 	else
-		warn "部分工具未检测到，请检查以上列表"
+		error "安装验证失败：仍有必需工具未检测到"
+		return 1
 	fi
 }
 
@@ -633,11 +676,10 @@ print_summary() {
 	echo ""
 	echo -e "  ${BOLD}后续操作:${NC}"
 	echo -e "  1. 重新登录或执行 ${GREEN}exec zsh${NC} 以加载新配置"
-	echo -e "  2. 在 tmux 中按 ${GREEN}Ctrl+Space, I${NC} 安装 tmux 插件"
-	echo -e "  3. 打开 nvim 将自动安装 LazyVim 插件"
-	echo -e "  4. 执行 ${GREEN}ya pkg install${NC} 安装 Yazi 插件 (如未自动安装)"
-	echo -e "  5. 执行 ${GREEN}tldr --update${NC} 更新 tealdeer 缓存"
-	echo -e "  6. 如果 Kanata 服务未自动启动，重新登录后执行:"
+	echo -e "  2. 打开 nvim 将自动安装/同步 LazyVim 插件"
+	echo -e "  3. 执行 ${GREEN}tldr --update${NC} 更新 tealdeer 缓存"
+	echo -e "  4. 如需 Hyprland 桌面，执行 ${GREEN}./install_desktop_arch.sh${NC}"
+	echo -e "  5. 如果 Kanata 服务未自动启动，重新登录后执行:"
 	echo -e "     ${GREEN}systemctl --user status kanata.service${NC} 检查状态"
 	echo ""
 	echo -e "  ${BOLD}常用命令:${NC}"
@@ -659,11 +701,10 @@ main() {
 	detect_os
 	install_prerequisites
 	install_packages
-	# 创建 SSH 连接复用 socket 目录 (ControlPath 依赖)
-	mkdir -p ~/.ssh/sockets && chmod 700 ~/.ssh/sockets
+	setup_runtime_dirs
 	# 将 apply_dotfiles 提前，确保后续步骤能读取到配置 (如 config.toml, package.toml 等)
 	apply_dotfiles
-	setup_hyprland_local_conf
+	setup_hyprland_local_lua
 	setup_mise
 	install_rustup
 	setup_neovim_providers

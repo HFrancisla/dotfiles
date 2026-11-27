@@ -80,10 +80,10 @@ Thumbs.db
 Desktop.ini
 
 # ==========================================
-# 6. 机器本地配置 (由 install_desktop.sh 自动生成)
+# 6. 机器本地配置 (由 install_desktop_arch.sh 自动生成)
 # ==========================================
 # 基于硬件检测生成的 GPU 环境变量等，每台机器不同
-.config/hypr/local.conf
+.config/hypr/local.lua
 
 # ==========================================
 # 7. 桌面环境配置 (仅 Arch Linux + Hyprland 需要)

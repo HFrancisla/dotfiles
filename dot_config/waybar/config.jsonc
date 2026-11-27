@@ -128,8 +128,7 @@
 	},
     "custom/gpu": {
         "exec": "~/.config/waybar/scripts/gpu-usage.sh",
-        "format": "{}% 󰢮",
-        "return-type": "",
+        "format": "{} 󰢮",
         "interval": 2,
 		"min-length": 7,
 		"align": 0.5

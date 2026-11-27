@@ -6,8 +6,8 @@ Config(
     y: Absolute(16),
     // 宽度 (屏幕 45%)
     width: Fraction(0.45),
-    // 最小高度 (Absolute(0) = 动态高度，跟随结果条数自动伸缩)
-    height: Absolute(0),
+    // 最小高度；1px 允许窗口随结果扩展后再次收缩（0 会导致只增不减）
+    height: Absolute(1),
 
     // ── 外观 ────────────────────────────────────────────────────────────────
     // 隐藏匹配结果和插件信息的图标
@@ -22,7 +22,7 @@ Config(
     // ── 行为 ────────────────────────────────────────────────────────────────
     // 点击外部关闭
     close_on_click: true,
-    // 启动时立即显示结果 (剪贴板历史等 stdin 插件依赖此选项)
+    // 启动时立即显示结果；剪贴板 stdin 调用需要立即展示已有输入
     show_results_immediately: true,
     // 最大结果条数 (None = 不限制)
     max_entries: None,
@@ -32,7 +32,6 @@ Config(
     // 排列顺序决定结果的优先级
     plugins: [
         "libapplications.so",
-        "libstdin.so",
         "libshell.so",
         "libtranslate.so",
     ],
