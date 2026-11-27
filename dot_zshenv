@@ -31,7 +31,6 @@ export LANG="C.UTF-8"
 export STARSHIP_CONFIG="$XDG_CONFIG_HOME/starship/starship.toml"
 export GDBHISTFILE="$XDG_STATE_HOME/gdb/history"
 export PSQLRC="$XDG_CONFIG_HOME/postgresql/psqlrc"
-export PSQL_HISTORY="$XDG_STATE_HOME/postgresql/psql_history"
 export PSPG_CONF="$XDG_CONFIG_HOME/pspg/pspgconf"
 export IREDIS_CONFIG="$XDG_CONFIG_HOME/iredis/iredisrc"
 # 加载 Rust 环境

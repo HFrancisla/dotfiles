@@ -76,11 +76,18 @@ alias gtree="git log --graph --abbrev-commit --decorate --format=format:'%C(bold
 # fgb: 交互式切换分支 (基于 fzf)
 fgb() {
   local branch
-  branch=$(git branch -a --color=always | grep -v '/HEAD\s' | sort |
-    fzf --ansi --tac --preview-window right:70% \
-        --preview 'git log --oneline --graph --date=short --color=always --pretty="format:%C(auto)%cd %h%d %s" $(sed s/^..// <<< {} | cut -d" " -f1)' |
-    sed 's/^..//' | cut -d' ' -f1 | sed 's#^remotes/##')
-  [[ -n "$branch" ]] && git checkout "$branch"
+  branch=$(git branch -a --format='%(refname:short)' |
+    grep -v '/HEAD$' | sort |
+    fzf --tac --preview-window right:70% \
+        --preview 'git log --oneline --graph --date=short --color=always --pretty="format:%C(auto)%cd %h%d %s" {}')
+  [[ -n "$branch" ]] || return 0
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    git switch "$branch"
+  else
+    # 远端跟踪分支必须显式创建本地 tracking branch，避免 checkout origin/foo 进入 detached HEAD。
+    git switch --track "$branch"
+  fi
 }
 
 # -------------------- 6. Python uv 虚拟环境 --------------------

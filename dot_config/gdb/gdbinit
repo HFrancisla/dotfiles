@@ -37,7 +37,7 @@ set disassembly-flavor intel
 # --- 4. 多线程 ---
 # 调试多线程时仅暂停命中断点的线程，其余继续运行
 # 如需所有线程同步暂停可改为 off
-set non-stop off
+set non-stop on
 # 打印线程事件（创建 / 退出）
 set print thread-events on
 

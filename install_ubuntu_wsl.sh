@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# Dotfiles One-Click Deployment Script (chezmoi) — Ubuntu / Debian / WSL2
+# Dotfiles One-Click Deployment Script (chezmoi) — Ubuntu / WSL2
 # ==============================================================================
 # 支持的环境:
-#   - Ubuntu / Debian / 其他 Linux (使用 Homebrew)
-#   - WSL2 环境兼容
+#   - Ubuntu 原生环境 (使用 Homebrew)
+#   - Ubuntu on WSL2
 #
 # 用法:
 #   curl -fsSL <raw_url>/install_ubuntu_wsl.sh | bash

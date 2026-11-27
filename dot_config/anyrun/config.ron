@@ -10,9 +10,9 @@ Config(
     height: Absolute(1),
 
     // ── 外观 ────────────────────────────────────────────────────────────────
-    // 隐藏匹配结果和插件信息的图标
+    // 显示匹配结果和插件信息的图标
     hide_icons: false,
-    // 隐藏底部插件信息面板
+    // 显示底部插件信息面板
     hide_plugin_info: false,
     // 忽略排他区域 (如 Waybar 占用的区域)
     ignore_exclusive_zones: false,

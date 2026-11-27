@@ -1,9 +1,7 @@
 # -------------------- 1. 环境变量 (Environment Variables) --------------------
-# 大多数的静态环境变量已经放到了~/.zshenv下
-# Intel 集成显卡专用：自动检测是否存在 Intel 显卡
-if command -v lspci >/dev/null 2>&1 && lspci | grep -qiE 'VGA.*Intel|3D.*Intel|Display.*Intel'; then
-    export LIBVA_DRIVER_NAME=iHD
-fi
+# 大多数静态环境变量已经放到了 ~/.zshenv。
+# Arch 桌面的 GPU/VA-API 环境由 install_desktop_arch.sh 按机器硬件生成到
+# ~/.config/hypr/local.lua，避免交互式 shell 再次按不同规则覆盖。
 
 # --- less & bat & fzf 环境变量 ---
 export MANPAGER='less -q'
@@ -127,13 +125,16 @@ rfv() {
 
 # yazi 集成
 y() {
-    local tmp cwd
-    tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+    local tmp cwd yazi_status
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return
     command yazi "$@" --cwd-file="$tmp"
-    if IFS= read -r -d '' cwd < "$tmp" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && [ -d "$cwd" ]; then
+    yazi_status=$?
+    cwd="$(cat -- "$tmp" 2>/dev/null)"
+    command rm -f -- "$tmp"
+    if [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && [ -d "$cwd" ]; then
         builtin cd -- "$cwd"
     fi
-    command rm -f -- "$tmp"
+    return "$yazi_status"
 }
 
 # 代理函数 (跨平台/WSL兼容优化)
