@@ -27,5 +27,5 @@ Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 ```
 
 SSH 的通用默认值由 chezmoi 管理在 `~/.ssh/config.d/10-dotfiles.conf`。
-`~/.ssh/config` 由幂等脚本在末尾的 `Host *` 块中包含该文件，因此机器私有
-Host 配置可以继续保留在主配置中，不会被 dotfiles 覆盖。
+`~/.ssh/config` 使用 chezmoi 的 `modify_` 机制只维护文件末尾的共享 Include，
+不会整体接管主配置，因此机器私有 Host 配置可以继续保留并优先于共享默认值。

@@ -243,8 +243,8 @@ setup_hyprland_local_lua() {
 setup_runtime_dirs() {
 	step "准备运行时目录"
 
-	mkdir -p "$HOME/.local/state/gdb" "$HOME/.local/state/postgresql" "$HOME/.ssh/sockets"
-	chmod 700 "$HOME/.ssh" "$HOME/.ssh/sockets"
+	mkdir -p "$HOME/.local/state/gdb" "$HOME/.local/state/postgresql" "$HOME/.ssh"
+	chmod 700 "$HOME/.ssh"
 
 	success "运行时目录已就绪"
 }

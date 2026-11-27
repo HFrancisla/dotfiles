@@ -110,7 +110,7 @@ Desktop.ini
 # 同步 config 但忽略运行时的状态文件
 .ssh/known_hosts
 .ssh/known_hosts.old
-.ssh/sockets/
+.ssh/cm-*
 # 忽略随机生成的密钥对（除非你确定要用 chezmoi 管理它们）
 **/*.pem
 **/*.key

@@ -1,0 +1,92 @@
+#!/bin/sh
+set -eu
+
+marker='# dotfiles: shared SSH defaults'
+include_line='Include ~/.ssh/config.d/10-dotfiles.conf'
+
+# chezmoi passes the current ~/.ssh/config on stdin and uses stdout as the
+# desired file content. Keep every unrelated stanza, remove any previous
+# dotfiles-owned block, trim only trailing blank lines, then append one
+# canonical managed block at EOF.
+awk -v marker="$marker" -v inc="$include_line" '
+    function trim(value) {
+        sub(/^[[:space:]]+/, "", value)
+        sub(/[[:space:]]+$/, "", value)
+        return value
+    }
+
+    function emit(line, normalized_line) {
+        if (normalized_line == "") {
+            blanks = blanks line ORS
+            return
+        }
+
+        printf "%s", blanks
+        blanks = ""
+        print line
+        wrote = 1
+    }
+
+    {
+        normalized = trim($0)
+
+        if (normalized == marker) {
+            state = 1
+            managed_blanks = ""
+            next
+        }
+
+        if (state == 1 && normalized == "") {
+            next
+        }
+
+        if (state == 1 && normalized == "Host *") {
+            state = 2
+            next
+        }
+
+        if (state == 1) {
+            state = 0
+        }
+
+        if (state == 2 && normalized == "") {
+            managed_blanks = managed_blanks $0 ORS
+            next
+        }
+
+        if (state == 2 && normalized == inc) {
+            state = 0
+            managed_blanks = ""
+            next
+        }
+
+        if (state == 2) {
+            # A marker followed by Host * but not by the managed Include is a
+            # damaged/edited block. Preserve that Host context so unexpected
+            # user directives do not silently change meaning.
+            emit("Host *", "Host *")
+            blanks = blanks managed_blanks
+            state = 0
+            managed_blanks = ""
+        }
+
+        # The Include path itself is owned by dotfiles, so collapse duplicates
+        # even if the marker was manually removed.
+        if (normalized == inc) {
+            next
+        }
+
+        emit($0, normalized)
+    }
+
+    END {
+        # Intentionally discard pending trailing blank lines and normalize the
+        # separator before the managed block to exactly one empty line.
+        if (wrote) {
+            print ""
+        }
+        print marker
+        print "Host *"
+        print inc
+    }
+'
