@@ -5,9 +5,77 @@ marker='# dotfiles: shared SSH defaults'
 include_line='Include ~/.ssh/config.d/10-dotfiles.conf'
 
 # chezmoi passes the current ~/.ssh/config on stdin and uses stdout as the
-# desired file content. Keep every unrelated stanza, remove any previous
-# dotfiles-owned block, trim only trailing blank lines, then append one
-# canonical managed block at EOF.
+# desired file content. First remove the exact legacy Host * stanza that older
+# versions of these dotfiles owned as a whole file. The match is deliberately
+# strict: any added directive or changed value means the stanza is user-owned
+# and must be preserved.
+awk '
+    function trim(value) {
+        sub(/^[[:space:]]+/, "", value)
+        sub(/[[:space:]]+$/, "", value)
+        return value
+    }
+
+    function flush(    i, n, normalized, legacy) {
+        if (!buffering) {
+            return
+        }
+
+        n = 0
+        delete actual
+        for (i = 1; i <= count; i++) {
+            normalized = trim(buffer[i])
+            if (normalized != "") {
+                actual[++n] = normalized
+            }
+        }
+
+        legacy = n == 7 &&
+            actual[1] == "Host *" &&
+            actual[2] == "ServerAliveInterval 60" &&
+            actual[3] == "ServerAliveCountMax 3" &&
+            actual[4] == "AddKeysToAgent yes" &&
+            actual[5] == "ControlMaster auto" &&
+            actual[6] == "ControlPath ~/.ssh/sockets/%r@%h-%p" &&
+            actual[7] == "ControlPersist 10m"
+
+        if (!legacy) {
+            for (i = 1; i <= count; i++) {
+                print buffer[i]
+            }
+        }
+
+        delete buffer
+        count = 0
+        buffering = 0
+    }
+
+    {
+        normalized = trim($0)
+
+        if (normalized ~ /^(Host|Match)[[:space:]]+/) {
+            flush()
+            if (normalized == "Host *") {
+                buffering = 1
+                buffer[++count] = $0
+                next
+            }
+        }
+
+        if (buffering) {
+            buffer[++count] = $0
+            next
+        }
+
+        print
+    }
+
+    END {
+        flush()
+    }
+' |
+# Then keep every unrelated stanza, remove any previous dotfiles-owned managed
+# block, trim only trailing blank lines, and append one canonical block at EOF.
 awk -v marker="$marker" -v inc="$include_line" '
     function trim(value) {
         sub(/^[[:space:]]+/, "", value)
