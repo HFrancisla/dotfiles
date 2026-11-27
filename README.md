@@ -2,6 +2,14 @@
 
 Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 
+The canonical local source is the development repository at
+`~/workspace/personal/dotfiles`. On a fresh machine, bootstrap runs
+`chezmoi init --source ~/workspace/personal/dotfiles <repo>`, so chezmoi clones
+the repository directly to that path and the generated config records the actual
+source directory. After initialization, plain
+`chezmoi diff`, `chezmoi apply`, and `chezmoi update` use this repository
+directly; no second clone under `~/.local/share/chezmoi` is required.
+
 ## Stack
 
 | Category | Tools |

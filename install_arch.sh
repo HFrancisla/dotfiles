@@ -405,12 +405,12 @@ install_tpm() {
 apply_dotfiles() {
 	step "使用 chezmoi 应用 dotfiles"
 
-	local CHEZMOI_SOURCE="$HOME/.local/share/chezmoi"
+	local CHEZMOI_SOURCE="$HOME/workspace/personal/dotfiles"
 	local DOTFILES_REPO="https://github.com/HFrancisla/dotfiles.git"
 
-	# 如果 source 目录不是一个完整的 Git 仓库，则进行初始化
+	# 开发仓库本身就是唯一的 chezmoi source，不再维护 ~/.local/share/chezmoi 的第二份 clone。
 	if [ ! -d "$CHEZMOI_SOURCE/.git" ]; then
-		info "正在从远程仓库初始化 chezmoi: $DOTFILES_REPO"
+		info "正在克隆 dotfiles 开发仓库到: $CHEZMOI_SOURCE"
 
 		# 如果存在非 Git 目录，先备份以防冲突
 		if [ -d "$CHEZMOI_SOURCE" ]; then
@@ -420,16 +420,22 @@ apply_dotfiles() {
 			mv "$CHEZMOI_SOURCE" "$backup_name"
 		fi
 
-		# 标准初始化：这会自动 clone 仓库到 ~/.local/share/chezmoi
-		chezmoi init "$DOTFILES_REPO"
-		success "chezmoi 初始化完成"
+		mkdir -p "$(dirname "$CHEZMOI_SOURCE")"
+		chezmoi init --source "$CHEZMOI_SOURCE" "$DOTFILES_REPO"
+		success "dotfiles 开发仓库已由 chezmoi 初始化"
 	else
-		info "chezmoi 特征目录已存在，正在拉取远程最新配置..."
-		# 使用 chezmoi 的内建 git 命令拉取最新代码
-		# --autostash 可以在你有未提交的本地更改时自动暂存，避免 pull 失败
-		chezmoi git pull -- --autostash --rebase
+		info "dotfiles 开发仓库已存在，正在拉取远程最新配置..."
+		git -C "$CHEZMOI_SOURCE" pull --autostash --rebase
+		# 重新渲染 chezmoi 配置，确保 sourceDir 与当前开发仓库一致。
+		chezmoi init --source "$CHEZMOI_SOURCE"
 		success "本地 dotfiles 仓库已更新"
 	fi
+
+	if [ "$(chezmoi source-path)" != "$CHEZMOI_SOURCE" ]; then
+		error "chezmoi sourceDir 未正确指向开发仓库: $(chezmoi source-path)"
+		return 1
+	fi
+	success "chezmoi source 已绑定到开发仓库"
 
 	info "对比本地配置与仓库差异 (chezmoi diff)..."
 
