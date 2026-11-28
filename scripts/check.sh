@@ -97,6 +97,8 @@ test ! -e "$a/.config/wallpapers/lock.png"
 test "$(file -b --mime-type "$a/.config/wallpapers/lock.jpg")" = image/jpeg
 grep -q 'wallpapers/lock.jpg' "$a/.config/hypr/hyprlock.conf"
 grep -q 'wallpapers/wallpaper.png' "$a/.config/hypr/hyprland.lua"
+grep -Fq 'hl.env("XMODIFIERS", "@im=fcitx")' "$a/.config/hypr/hyprland.lua"
+grep -Fq 'hl.env("QT_IM_MODULE", "fcitx")' "$a/.config/hypr/hyprland.lua"
 "${ubuntu[@]}" apply
 "${arch[@]}" apply
 test "$(grep -c 'Include.*10-dotfiles.conf' "$a/.ssh/config")" = 1
