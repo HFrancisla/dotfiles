@@ -13,15 +13,19 @@ export XDG_STATE_HOME="$HOME/.local/state"
 
 # --- 2. Zsh 核心重定向 ---
 # 告诉 Zsh 去哪里找 .zshrc 等配置文件 (极其关键)
-export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+# ZDOTDIR 仅用于当前 Zsh 启动链；不传给子 Zsh，否则子进程会跳过 ~/.zshenv。
+typeset +x ZDOTDIR
 
 # --- 3. 系统基础路径与变量 ---
-# 将个人和本地的 bin 目录放在最前面，优先使用
+# PATH 与 path 为 Zsh 绑定变量；保持唯一，避免重复加载产生重复项。
+typeset -U path PATH
+# 优先级：mise > Homebrew LLVM > Homebrew > Rust > WSL > 个人目录 > 系统目录。
 export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
 
 # WSL 互操作工具路径
 # 仅在 WSL 目录存在时添加，避免影响 Arch 等其他环境
-if [[ -d "/usr/lib/wsl/lib" && ":$PATH:" != *":/usr/lib/wsl/lib:"* ]]; then
+if [[ -d "/usr/lib/wsl/lib" ]]; then
     export PATH="/usr/lib/wsl/lib:$PATH"
 fi
 
@@ -29,12 +33,14 @@ export LANG="C.UTF-8"
 
 # --- 4. 工具专属配置文件路径 ---
 export STARSHIP_CONFIG="$XDG_CONFIG_HOME/starship/starship.toml"
-export GDBHISTFILE="$XDG_STATE_HOME/gdb/history"
 export PSQLRC="$XDG_CONFIG_HOME/postgresql/psqlrc"
 export PSPG_CONF="$XDG_CONFIG_HOME/pspg/pspgconf"
 export IREDIS_CONFIG="$XDG_CONFIG_HOME/iredis/iredisrc"
 # 加载 Rust 环境
-[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+if [[ -f "$HOME/.cargo/env" ]]; then
+    . "$HOME/.cargo/env"
+    path=("$HOME/.cargo/bin" $path)
+fi
 
 # --- 5. Homebrew (硬编码，避免 eval fork 子进程) ---
 if [ -d "/home/linuxbrew/.linuxbrew" ]; then

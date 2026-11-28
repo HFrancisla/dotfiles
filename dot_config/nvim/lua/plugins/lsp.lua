@@ -13,7 +13,7 @@ return {
             },
             python = {
               analysis = {
-                -- "off" 让 Pyright 只负责补全和定义跳转，诊断全部交给 Ruff
+                -- 关闭 Pyright 类型检查；仍保留语言服务及其基础诊断，Ruff 负责 lint
                 typeCheckingMode = "off",
               },
             },

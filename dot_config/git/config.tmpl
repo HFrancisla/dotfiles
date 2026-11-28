@@ -1,17 +1,13 @@
 [user]
-    name  = {{ .name }}
-    email = {{ .email }}
+    name  = {{ .name | quote }}
+    email = {{ .email | quote }}
 
 [core]
     # 指定全局忽略文件位置
     excludesfile = ~/.config/git/ignore
 
     # 设置默认编辑器
-    {{- if eq .chezmoi.os "windows" }}
-    editor = code --wait
-    {{- else }}
     editor = nvim
-    {{- end }}
 
     autocrlf = input    # 提交时转换为 LF，检出时不转换
     compression = 9     # 最高压缩率 (CPU 换流量)
@@ -65,11 +61,9 @@
     autoStash = true        # Rebase 前自动暂存，结束后自动恢复
 
 [credential]
-    {{- if eq .chezmoi.os "windows" }}
-    helper = manager
-    {{- else }}
-    helper = store
-    {{- end }}
+    # 凭据仅缓存在内存，避免将 token 明文写入磁盘
+    helper =
+    helper = cache --timeout=3600
 
 
 # --- 颜色与视觉配置 ---

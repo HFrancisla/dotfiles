@@ -42,13 +42,14 @@ set non-stop on
 set print thread-events on
 
 # --- 5. 安全与自动加载 ---
-# 允许当前目录下的 .gdbinit（项目级配置）
+# 允许受信任工作区中的项目级 .gdbinit
 set auto-load local-gdbinit on
 # 允许自动加载 Python/GDB 脚本
 set auto-load python-scripts on
 set auto-load gdb-scripts on
-# 允许调试信息中的安全路径自动加载
+# 允许系统调试脚本及个人开发工作区中的项目配置自动加载
 add-auto-load-safe-path /usr
+add-auto-load-safe-path ~/workspace
 
 # --- 6. 常用省力设置 ---
 # 退出时不需要确认

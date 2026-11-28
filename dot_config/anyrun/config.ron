@@ -3,7 +3,7 @@ Config(
     // 水平居中
     x: Fraction(0.5),
     // 垂直位置 (紧贴 waybar 下方)
-    y: Absolute(16),
+    y: Absolute(0),
     // 宽度 (屏幕 45%)
     width: Fraction(0.45),
     // 最小高度；1px 允许窗口随结果扩展后再次收缩（0 会导致只增不减）
@@ -33,6 +33,5 @@ Config(
     plugins: [
         "libapplications.so",
         "libshell.so",
-        "libtranslate.so",
     ],
 )

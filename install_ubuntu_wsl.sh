@@ -11,7 +11,7 @@
 #   或者 clone 后直接执行: bash install_ubuntu_wsl.sh
 # ==============================================================================
 
-set -euo pipefail
+set -Eeuo pipefail
 
 # -------------------- 环境检查 --------------------
 if ((BASH_VERSINFO[0] < 4)); then
@@ -35,6 +35,12 @@ success() { echo -e "${GREEN}[SUCCESS]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC}    $*"; }
 error() { echo -e "${RED}[ERROR]${NC}   $*" >&2; }
 step() { echo -e "\n${CYAN}${BOLD}▸ $*${NC}"; }
+
+# 安装过程中需要普通用户的 HOME 及配置；特权操作由 sudo 单独执行。
+if (( EUID == 0 )); then
+	error "请以普通用户运行安装脚本，不要使用 sudo bash"
+	exit 1
+fi
 
 # -------------------- OS 检测 --------------------
 detect_os() {
@@ -66,8 +72,8 @@ install_prerequisites() {
 	step "检查基础依赖 (git, curl, zsh, build-essential)"
 
 	local missing=()
-	for pkg in git curl zsh build-essential procps file dnsutils strace ltrace bpftrace bpfcc-tools bubblewrap gdb postgresql-client less unzip; do
-		if ! dpkg -s "$pkg" &>/dev/null; then
+	for pkg in git curl zsh build-essential procps file dnsutils gnupg strace ltrace bpftrace bpfcc-tools bubblewrap gdb postgresql-client less unzip; do
+		if [[ "$(dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null)" != "install ok installed" ]]; then
 			missing+=("$pkg")
 		fi
 	done
@@ -151,7 +157,7 @@ install_packages() {
 	local DEV_PACKAGES=(
 		llvm          # 编译工具链 (.zshrc 中配置了 PATH)
 		mise          # 多语言版本管理 (Node/Lua/Python/Java/Go + CLI)
-		luarocks      # Lua 包管理器
+		shellcheck    # Shell 静态分析 (scripts/check.sh 依赖)
 		gh            # GitHub CLI (Homebrew 包名)
 		lazygit       # Git TUI (LazyVim 集成)
 		serpl         # 项目级搜索替换 TUI (tmux 快捷键依赖)
@@ -260,17 +266,21 @@ setup_mise() {
 	# 激活 mise 到当前 bootstrap Bash 进程。
 	eval "$(mise activate bash)"
 
-	# 跳过 Node.js GPG 签名验证 (Homebrew gpg 与系统 keyboxd 版本冲突，checksum 校验仍有效)
-	export MISE_NODE_VERIFY=false
-
+	# 使用系统 GnuPG，避免 Homebrew gpg 与系统 keyboxd 版本冲突。
+	# 保留 mise 的 Node.js 签名校验，不设置 MISE_NODE_VERIFY=false。
 	# 全局配置只有静态 tools/settings，不需要 trust；直接安装所有配置工具。
 	info "安装 mise 配置的运行时和 CLI 工具..."
-	if ! mise install --yes; then
+	if ! PATH="/usr/bin:$PATH" MISE_NODE_VERIFY=true MISE_NODE_GPG_VERIFY=true mise install --yes; then
 		error "mise 工具安装失败"
 		return 1
 	fi
 	mise reshim
-
+	# mise 自带 LuaRocks，校验其解释器版本，避免系统 LuaRocks 指向其他 Lua。
+	if [[ "$(mise exec -- lua -e 'print(_VERSION)')" != "Lua 5.1" ]] ||
+	   [[ "$(mise exec -- luarocks config lua_version)" != "5.1" ]]; then
+		error "mise Lua 与 LuaRocks 版本不一致"
+		return 1
+	fi
 
 	success "mise 工具环境初始化完成"
 }
@@ -332,8 +342,11 @@ install_oh_my_zsh() {
 
 	local OMZ_DIR="${ZSH:-$HOME/.oh-my-zsh}"
 
-	if [ -d "$OMZ_DIR" ]; then
+	if [ -r "$OMZ_DIR/oh-my-zsh.sh" ]; then
 		info "Oh My Zsh 已安装"
+	elif [ -e "$OMZ_DIR" ]; then
+		error "Oh My Zsh 目录存在但不完整: $OMZ_DIR，请检查后重试"
+		return 1
 	else
 		info "正在安装 Oh My Zsh..."
 		# --unattended: 隐含 RUNZSH=no 和 CHSH=no (不切换 shell、不启动 zsh)
@@ -364,8 +377,16 @@ install_zsh_plugins() {
 
 	for plugin_name in "${!ZSH_PLUGIN_REPOS[@]}"; do
 		local plugin_dir="$plugins_dir/$plugin_name"
-		if [ -d "$plugin_dir" ]; then
+		local plugin_entry
+		case "$plugin_name" in
+			zsh-completions) plugin_entry="$plugin_dir/src" ;;
+			*) plugin_entry="$plugin_dir/$plugin_name.plugin.zsh" ;;
+		esac
+		if [ -e "$plugin_entry" ]; then
 			info "插件已存在: $plugin_name (跳过)"
+		elif [ -e "$plugin_dir" ]; then
+			error "插件目录存在但不完整: $plugin_dir"
+			return 1
 		else
 			info "克隆插件: $plugin_name"
 			git clone --depth 1 "${ZSH_PLUGIN_REPOS[$plugin_name]}" "$plugin_dir"
@@ -375,8 +396,11 @@ install_zsh_plugins() {
 	# zsh-shift-select: 统一安装到 OMZ custom 目录
 	local shift_select_dir="$ZSH_CUSTOM/plugins/zsh-shift-select"
 
-	if [ -d "$shift_select_dir" ]; then
+	if [ -r "$shift_select_dir/zsh-shift-select.plugin.zsh" ]; then
 		info "插件已存在: zsh-shift-select (跳过)"
+	elif [ -e "$shift_select_dir" ]; then
+		error "插件目录存在但不完整: $shift_select_dir"
+		return 1
 	else
 		info "克隆插件: zsh-shift-select (Shift+Arrow 文本选择)"
 		mkdir -p "$(dirname "$shift_select_dir")"
@@ -396,7 +420,10 @@ install_tpm() {
 		info "TPM 已安装"
 	else
 		info "正在安装 TPM..."
-		rm -rf "$TPM_DIR"
+		if [ -e "$TPM_DIR" ]; then
+			error "TPM 目录存在但不完整: $TPM_DIR，请检查后重试"
+			return 1
+		fi
 		mkdir -p "$(dirname "$TPM_DIR")"
 		git clone --depth 1 https://github.com/tmux-plugins/tpm "$TPM_DIR"
 		success "TPM 安装完成"
@@ -411,7 +438,7 @@ apply_dotfiles() {
 	local DOTFILES_REPO="https://github.com/HFrancisla/dotfiles.git"
 
 	# 开发仓库本身就是唯一的 chezmoi source，不再维护 ~/.local/share/chezmoi 的第二份 clone。
-	if [ ! -d "$CHEZMOI_SOURCE/.git" ]; then
+	if [ ! -e "$CHEZMOI_SOURCE/.git" ]; then
 		info "正在克隆 dotfiles 开发仓库到: $CHEZMOI_SOURCE"
 
 		# 如果存在非 Git 目录，先备份以防冲突
@@ -426,11 +453,11 @@ apply_dotfiles() {
 		chezmoi init --source "$CHEZMOI_SOURCE" "$DOTFILES_REPO"
 		success "dotfiles 开发仓库已由 chezmoi 初始化"
 	else
-		info "dotfiles 开发仓库已存在，正在拉取远程最新配置..."
-		git -C "$CHEZMOI_SOURCE" pull --autostash --rebase
+		info "使用已有 dotfiles 开发仓库；不自动 pull/rebase 或修改 Git 工作区"
+		git -C "$CHEZMOI_SOURCE" rev-parse --is-inside-work-tree >/dev/null
 		# 重新渲染 chezmoi 配置，确保 sourceDir 与当前开发仓库一致。
 		chezmoi init --source "$CHEZMOI_SOURCE"
-		success "本地 dotfiles 仓库已更新"
+		success "已绑定现有本地 dotfiles 仓库"
 	fi
 
 	if [ "$(chezmoi source-path)" != "$CHEZMOI_SOURCE" ]; then
@@ -457,8 +484,7 @@ apply_dotfiles() {
 		echo "$diff_output"
 		echo ""
 		echo -e "${YELLOW}${BOLD}即将应用以上更改到家目录。${NC}"
-		read -rp "是否继续? [Y/n] " confirm </dev/tty
-		confirm=${confirm:-Y}
+		read -rp "是否继续? [y/N] " confirm </dev/tty || return 1
 
 		if [[ "$confirm" =~ ^[Yy]$ ]]; then
 			chezmoi apply -v
@@ -546,7 +572,7 @@ post_install_check() {
 		dust duf procs gping tldr
 		diff-so-fancy delta yazi lazygit serpl jq yq dasel xmlstarlet repren gh
 		bandwhich trip mtr progress
-		clang luarocks sqlite3 dive trivy
+		clang luarocks sqlite3 dive trivy shellcheck
 		mise uv btm ncdu glow
 		ffmpeg pdftotext pandoc dos2unix pv less unzip
 		gdb psql pgcli mycli iredis pspg
@@ -567,7 +593,12 @@ post_install_check() {
 	printf "  %-18s %s\n" "------------------" "------"
 
 	for tool in "${tools[@]}"; do
-		if command -v "$tool" &>/dev/null; then
+		local resolved
+		resolved=$(command -v "$tool" 2>/dev/null) || resolved=""
+		if [[ "$resolved" == */mise/shims/* ]]; then
+			resolved=$(mise which "$tool" 2>/dev/null) || resolved=""
+		fi
+		if [[ -n "$resolved" && -x "$resolved" ]]; then
 			printf "  %-18s ${GREEN}✓ 已安装${NC}\n" "$tool"
 		else
 			printf "  %-18s ${RED}✗ 未检测到${NC}\n" "$tool"
@@ -610,7 +641,7 @@ print_summary() {
 	echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════════╝${NC}"
 	echo ""
 	echo -e "  ${BOLD}后续操作:${NC}"
-	echo -e "  1. 重新登录或执行 ${GREEN}exec zsh${NC} 以加载新配置"
+	echo -e "  1. 重新登录或执行 ${GREEN}exec env -u ZDOTDIR zsh${NC} 以加载新配置"
 	echo -e "  2. 打开 nvim 将自动安装/同步 LazyVim 插件"
 	echo -e "  3. 执行 ${GREEN}tldr --update${NC} 更新 tealdeer 缓存"
 	echo ""

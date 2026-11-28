@@ -19,7 +19,7 @@
 \set PROMPT1 '%n@%M:%/%R%x%# '
 \set PROMPT2 '%R%x  ... > '
 
--- --- 3. 历史记录 (XDG 路径，按数据库分离) ---
+-- --- 3. 历史记录 (XDG 路径，按会话初始连接数据库分离) ---
 -- 需要确保目录存在: mkdir -p "$XDG_STATE_HOME/postgresql"
 \getenv xdg_state XDG_STATE_HOME
 \set HISTFILE :xdg_state/postgresql/psql_history-:DBNAME

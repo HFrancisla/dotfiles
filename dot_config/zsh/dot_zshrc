@@ -17,6 +17,8 @@ export BAT_PAGER="less -RF"
 export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always {}' --bind 'ctrl-/:change-preview-window(down|hidden|)'"
 export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {}'"
 
+typeset -U fpath
+
 # --- Homebrew 补全路径 (PATH 等已在 .zshenv 中设置) ---
 if [ -n "$HOMEBREW_PREFIX" ] && [ -d "$HOMEBREW_PREFIX/share/zsh/site-functions" ]; then
     fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
@@ -129,7 +131,7 @@ y() {
     tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return
     command yazi "$@" --cwd-file="$tmp"
     yazi_status=$?
-    cwd="$(cat -- "$tmp" 2>/dev/null)"
+    cwd="$(command cat -- "$tmp" 2>/dev/null)"
     command rm -f -- "$tmp"
     if [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && [ -d "$cwd" ]; then
         builtin cd -- "$cwd"
@@ -137,27 +139,36 @@ y() {
     return "$yazi_status"
 }
 
-# 代理函数 (跨平台/WSL兼容优化)
+# 代理函数：mirrored 使用回环，NAT 使用默认网关；可显式传入宿主地址。
 proxy() {
-  local host_ip
-  # 检测是否处于 WSL 环境
-  if grep -qE "(Microsoft|WSL)" /proc/version &> /dev/null; then
-    # 提取 WSL 宿主机 IP
-    host_ip=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
-  else
-    # 物理机或 macOS 直接走本地回环
-    host_ip="127.0.0.1"
-  fi
-
-  export https_proxy="http://${host_ip}:7890"
-  export http_proxy="http://${host_ip}:7890"
-  export all_proxy="socks5://${host_ip}:7890"
-  echo "Proxy has been set to: ${host_ip}:7890"
+    local host_ip="${1:-}" mode
+    if [[ -z "$host_ip" ]]; then
+        if command grep -qiE '(Microsoft|WSL)' /proc/version 2>/dev/null; then
+            mode=$(wslinfo --networking-mode 2>/dev/null) || mode=unknown
+            case "$mode" in
+                mirrored) host_ip=127.0.0.1 ;;
+                nat|virtioproxy|unknown)
+                    host_ip=$(ip -4 route show default | awk '$1 == "default" && $2 == "via" {print $3; exit}')
+                    ;;
+                *) print -u2 "无法自动识别 WSL 网络模式: $mode，请使用 proxy <host>"; return 1 ;;
+            esac
+        else
+            host_ip=127.0.0.1
+        fi
+    fi
+    if [[ -z "$host_ip" || "$host_ip" == *[[:space:]/]* ]]; then
+        print -u2 "无法确定代理地址，请使用 proxy <host>"
+        return 1
+    fi
+    export http_proxy="http://${host_ip}:7890" https_proxy="http://${host_ip}:7890"
+    export all_proxy="socks5h://${host_ip}:7890"
+    export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" ALL_PROXY="$all_proxy"
+    print -r -- "Proxy has been set to: ${host_ip}:7890"
 }
 
 unproxy() {
-  unset https_proxy http_proxy all_proxy
-  echo "Proxies have been unset."
+    unset https_proxy http_proxy all_proxy HTTPS_PROXY HTTP_PROXY ALL_PROXY
+    print -r -- "Proxies have been unset."
 }
 
 # conda 镜像切换 (通过 CONDARC 环境变量)

@@ -31,20 +31,20 @@ timing = True
 null_string = '⟨NULL⟩'
 
 # \pset linestyle unicode + \pset border 2
-# pgcli 的 psql 格式底层用 tabulate，已经是 unicode 边框
-table_format = psql
+# cli_helpers 的 psql_unicode 格式使用 Unicode 边框
+table_format = psql_unicode
 
 # \x auto → auto_expand (注意: expand 和 auto_expand 是两个独立布尔值)
 expand = False
 auto_expand = True
 
 # \setenv PAGER 'pspg --no-mouse'
-pager = pspg --no-mouse --pgcli-fix
+pager = pspg --no-mouse
 enable_pager = True
 
 # --- 5. 提示符 (对应 psqlrc §2) ---
 # psql:  %n@%M:%/%R%x%#
-# pgcli: \u=用户 \H=完整主机名 \d=数据库 \T=事务状态(*!/?) \#=角色标识(@/>)
+# pgcli: \u=用户 \H=完整主机名 \d=数据库 \T=事务状态(*!/?) \#=角色标识(#/>)
 # 注意: pgcli 没有 %R(连接状态) 的等价物，省略即可
 prompt = '\u@\H:\d\T\# '
 

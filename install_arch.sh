@@ -10,7 +10,7 @@
 #   或者 clone 后直接执行: bash install_arch.sh
 # ==============================================================================
 
-set -euo pipefail
+set -Eeuo pipefail
 
 # -------------------- 环境检查 --------------------
 if ((BASH_VERSINFO[0] < 4)); then
@@ -34,6 +34,12 @@ success() { echo -e "${GREEN}[SUCCESS]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC}    $*"; }
 error() { echo -e "${RED}[ERROR]${NC}   $*" >&2; }
 step() { echo -e "\n${CYAN}${BOLD}▸ $*${NC}"; }
+
+# 安装过程中需要普通用户的 HOME 及配置；特权操作由 sudo 单独执行。
+if (( EUID == 0 )); then
+	error "请以普通用户运行安装脚本，不要使用 sudo bash"
+	exit 1
+fi
 
 # -------------------- OS 检测 --------------------
 detect_os() {
@@ -64,7 +70,7 @@ install_prerequisites() {
 	sudo pacman -Syu --noconfirm
 
 	local missing=()
-	for pkg in git curl zsh base-devel bind strace ltrace bpftrace bcc-tools bubblewrap less unzip; do
+	for pkg in git curl zsh base-devel gnupg bind strace ltrace bpftrace bcc-tools bubblewrap less unzip; do
 		if ! pacman -Qi "$pkg" &>/dev/null; then
 			missing+=("$pkg")
 		fi
@@ -85,7 +91,7 @@ install_prerequisites() {
 }
 
 # -------------------- 安装 yay (AUR Helper) --------------------
-install_yay() {
+install_yay() (
 	info "从源码编译安装 yay..."
 	local yay_dir
 	yay_dir=$(mktemp -d)
@@ -95,7 +101,7 @@ install_yay() {
 	rm -rf "$yay_dir"
 	trap - EXIT
 	success "yay 安装完成"
-}
+)
 
 # -------------------- 安装核心工具包 --------------------
 install_packages() {
@@ -145,9 +151,8 @@ install_packages() {
 		llvm          # LLVM 基础工具链
 		clang         # C/C++ 编译器
 		mise          # 多语言版本管理 (Node/Lua/Python/Java/Go + CLI)
-		luarocks      # Lua 包管理器
-		lua-luarocks  # Lua 5.5 库文件 (luarocks 拆包后需要显式安装)
 		gdb            # 调试器 (配置由 dotfiles 管理)
+		shellcheck     # Shell 静态分析 (scripts/check.sh 依赖)
 		github-cli    # GitHub CLI (Arch 包名)
 		lazygit       # Git TUI (LazyVim 集成)
 		serpl         # 项目级搜索替换 TUI (tmux 快捷键依赖)
@@ -263,12 +268,17 @@ setup_mise() {
 
 	# 全局配置只有静态 tools/settings，不需要 trust；直接安装所有配置工具。
 	info "安装 mise 配置的运行时和 CLI 工具..."
-	if ! mise install --yes; then
+	if ! MISE_NODE_VERIFY=true MISE_NODE_GPG_VERIFY=true mise install --yes; then
 		error "mise 工具安装失败"
 		return 1
 	fi
 	mise reshim
-
+	# mise 自带 LuaRocks，校验其解释器版本，避免系统 LuaRocks 指向其他 Lua。
+	if [[ "$(mise exec -- lua -e 'print(_VERSION)')" != "Lua 5.1" ]] ||
+	   [[ "$(mise exec -- luarocks config lua_version)" != "5.1" ]]; then
+		error "mise Lua 与 LuaRocks 版本不一致"
+		return 1
+	fi
 
 	success "mise 工具环境初始化完成"
 }
@@ -330,8 +340,11 @@ install_oh_my_zsh() {
 
 	local OMZ_DIR="${ZSH:-$HOME/.oh-my-zsh}"
 
-	if [ -d "$OMZ_DIR" ]; then
+	if [ -r "$OMZ_DIR/oh-my-zsh.sh" ]; then
 		info "Oh My Zsh 已安装"
+	elif [ -e "$OMZ_DIR" ]; then
+		error "Oh My Zsh 目录存在但不完整: $OMZ_DIR，请检查后重试"
+		return 1
 	else
 		info "正在安装 Oh My Zsh..."
 		# --unattended: 隐含 RUNZSH=no 和 CHSH=no (不切换 shell、不启动 zsh)
@@ -373,8 +386,11 @@ install_zsh_plugins() {
 	local ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 	local shift_select_dir="$ZSH_CUSTOM/plugins/zsh-shift-select"
 
-	if [ -d "$shift_select_dir" ]; then
+	if [ -r "$shift_select_dir/zsh-shift-select.plugin.zsh" ]; then
 		info "插件已存在: zsh-shift-select (跳过)"
+	elif [ -e "$shift_select_dir" ]; then
+		error "插件目录存在但不完整: $shift_select_dir"
+		return 1
 	else
 		info "克隆插件: zsh-shift-select (Shift+Arrow 文本选择)"
 		mkdir -p "$(dirname "$shift_select_dir")"
@@ -394,7 +410,10 @@ install_tpm() {
 		info "TPM 已安装"
 	else
 		info "正在安装 TPM..."
-		rm -rf "$TPM_DIR"
+		if [ -e "$TPM_DIR" ]; then
+			error "TPM 目录存在但不完整: $TPM_DIR，请检查后重试"
+			return 1
+		fi
 		mkdir -p "$(dirname "$TPM_DIR")"
 		git clone --depth 1 https://github.com/tmux-plugins/tpm "$TPM_DIR"
 		success "TPM 安装完成"
@@ -409,7 +428,7 @@ apply_dotfiles() {
 	local DOTFILES_REPO="https://github.com/HFrancisla/dotfiles.git"
 
 	# 开发仓库本身就是唯一的 chezmoi source，不再维护 ~/.local/share/chezmoi 的第二份 clone。
-	if [ ! -d "$CHEZMOI_SOURCE/.git" ]; then
+	if [ ! -e "$CHEZMOI_SOURCE/.git" ]; then
 		info "正在克隆 dotfiles 开发仓库到: $CHEZMOI_SOURCE"
 
 		# 如果存在非 Git 目录，先备份以防冲突
@@ -424,11 +443,11 @@ apply_dotfiles() {
 		chezmoi init --source "$CHEZMOI_SOURCE" "$DOTFILES_REPO"
 		success "dotfiles 开发仓库已由 chezmoi 初始化"
 	else
-		info "dotfiles 开发仓库已存在，正在拉取远程最新配置..."
-		git -C "$CHEZMOI_SOURCE" pull --autostash --rebase
+		info "使用已有 dotfiles 开发仓库；不自动 pull/rebase 或修改 Git 工作区"
+		git -C "$CHEZMOI_SOURCE" rev-parse --is-inside-work-tree >/dev/null
 		# 重新渲染 chezmoi 配置，确保 sourceDir 与当前开发仓库一致。
 		chezmoi init --source "$CHEZMOI_SOURCE"
-		success "本地 dotfiles 仓库已更新"
+		success "已绑定现有本地 dotfiles 仓库"
 	fi
 
 	if [ "$(chezmoi source-path)" != "$CHEZMOI_SOURCE" ]; then
@@ -455,8 +474,7 @@ apply_dotfiles() {
 		echo "$diff_output"
 		echo ""
 		echo -e "${YELLOW}${BOLD}即将应用以上更改到家目录。${NC}"
-		read -rp "是否继续? [Y/n] " confirm </dev/tty
-		confirm=${confirm:-Y}
+		read -rp "是否继续? [y/N] " confirm </dev/tty || return 1
 
 		if [[ "$confirm" =~ ^[Yy]$ ]]; then
 			chezmoi apply -v
@@ -496,6 +514,9 @@ setup_kanata() {
 		info "kanata-bin 已安装"
 	fi
 
+	# 先解析配置，再申请输入设备权限。
+	/usr/bin/kanata --check --cfg "$HOME/.config/kanata/kanata.kbd"
+
 	# 2. 配置 uinput 权限 (kanata 需要访问 input 和 uinput 子系统)
 	info "配置 uinput 权限..."
 
@@ -516,25 +537,26 @@ setup_kanata() {
 	fi
 
 	# 创建 udev 规则
-	local UDEV_RULE='/etc/udev/rules.d/99-input.rules'
+	local UDEV_RULE='/etc/udev/rules.d/99-dotfiles-kanata.rules'
 	local UDEV_CONTENT='KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"'
-	if [ ! -f "$UDEV_RULE" ] || ! grep -q 'uinput' "$UDEV_RULE" 2>/dev/null; then
+	if [ ! -f "$UDEV_RULE" ] || ! grep -Fxq "$UDEV_CONTENT" "$UDEV_RULE"; then
 		info "创建 udev 规则: $UDEV_RULE"
 		echo "$UDEV_CONTENT" | sudo tee "$UDEV_RULE" >/dev/null
-		sudo udevadm control --reload-rules && sudo udevadm trigger
+		sudo udevadm control --reload-rules
+		sudo udevadm trigger --subsystem-match=misc --sysname-match=uinput
 	else
 		info "udev 规则已存在"
 	fi
 
 	# 确保 uinput 内核模块已加载
-	if ! lsmod | grep -q uinput; then
+	if [ ! -e /dev/uinput ]; then
 		info "加载 uinput 内核模块..."
 		sudo modprobe uinput
 	fi
 
 	# 确保 uinput 模块开机自动加载
-	local MODULES_LOAD='/etc/modules-load.d/uinput.conf'
-	if [ ! -f "$MODULES_LOAD" ]; then
+	local MODULES_LOAD='/etc/modules-load.d/dotfiles-kanata.conf'
+	if [ ! -f "$MODULES_LOAD" ] || ! grep -Fxq uinput "$MODULES_LOAD"; then
 		info "配置 uinput 模块开机自动加载..."
 		echo 'uinput' | sudo tee "$MODULES_LOAD" >/dev/null
 	fi
@@ -618,14 +640,15 @@ post_install_check() {
 		dust duf procs gping tldr
 		diff-so-fancy delta yazi lazygit serpl jq yq dasel xmlstarlet gh
 		gdu ncdu bandwhich trip mtr progress
-		clang luarocks sqlite3 uv dive trivy
+		clang luarocks sqlite3 uv dive trivy shellcheck
 		ffmpeg pdftotext glow pandoc dos2unix pv less unzip
 		gdb psql pgcli mycli iredis pspg
 		mise node npm pnpm tree-sitter lua python3 java go
 		neovim-node-host mmdc opencode pi voyager paseo
 		rustup cargo rustc clippy-driver rust-analyzer
-		kanata
 	)
+
+	if $INSTALL_KANATA; then tools+=(kanata); fi
 
 	# 有多个可能命令名的工具 (主命令|备选命令)
 	local tools_with_alt=(
@@ -638,7 +661,12 @@ post_install_check() {
 	printf "  %-18s %s\n" "──────────────────" "──────"
 
 	for tool in "${tools[@]}"; do
-		if command -v "$tool" &>/dev/null; then
+		local resolved
+		resolved=$(command -v "$tool" 2>/dev/null) || resolved=""
+		if [[ "$resolved" == */mise/shims/* ]]; then
+			resolved=$(mise which "$tool" 2>/dev/null) || resolved=""
+		fi
+		if [[ -n "$resolved" && -x "$resolved" ]]; then
 			printf "  %-18s ${GREEN}✓ 已安装${NC}\n" "$tool"
 		else
 			printf "  %-18s ${RED}✗ 未检测到${NC}\n" "$tool"
@@ -681,12 +709,15 @@ print_summary() {
 	echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════════╝${NC}"
 	echo ""
 	echo -e "  ${BOLD}后续操作:${NC}"
-	echo -e "  1. 重新登录或执行 ${GREEN}exec zsh${NC} 以加载新配置"
+	echo -e "  1. 重新登录或执行 ${GREEN}exec env -u ZDOTDIR zsh${NC} 以加载新配置"
 	echo -e "  2. 打开 nvim 将自动安装/同步 LazyVim 插件"
 	echo -e "  3. 执行 ${GREEN}tldr --update${NC} 更新 tealdeer 缓存"
 	echo -e "  4. 如需 Hyprland 桌面，执行 ${GREEN}./install_desktop_arch.sh${NC}"
-	echo -e "  5. 如果 Kanata 服务未自动启动，重新登录后执行:"
-	echo -e "     ${GREEN}systemctl --user status kanata.service${NC} 检查状态"
+	if $INSTALL_KANATA; then
+		echo -e "  5. Kanata 如未启动，重新登录后运行 systemctl --user status kanata.service"
+	else
+		echo -e "  5. Kanata 为可选组件，如需要，使用 --kanata 参数安装"
+	fi
 	echo ""
 	echo -e "  ${BOLD}常用命令:${NC}"
 	echo -e "  • ${GREEN}chezmoi edit <file>${NC}  编辑配置"
@@ -698,6 +729,14 @@ print_summary() {
 
 # ==================== 主流程 ====================
 main() {
+	INSTALL_KANATA=false
+	case "${1:-}" in
+		--kanata) INSTALL_KANATA=true; shift ;;
+	esac
+	if (( $# )); then
+		error "用法: bash install_arch.sh [--kanata]"
+		return 2
+	fi
 	echo ""
 	echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
 	echo -e "${CYAN}${BOLD}║      🚀 Dotfiles 一键部署脚本 (Arch Linux)      ║${NC}"
@@ -717,7 +756,7 @@ main() {
 	install_oh_my_zsh
 	install_tpm
 	install_yazi_plugins
-	setup_kanata
+	if $INSTALL_KANATA; then setup_kanata; fi
 	install_tmux_plugins
 	set_default_shell
 	post_install_check

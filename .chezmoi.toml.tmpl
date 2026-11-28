@@ -19,5 +19,5 @@ sourceDir = {{ .chezmoi.sourceDir | quote }}
 # 渲染后存入 ~/.config/chezmoi/chezmoi.toml，不会推送到 git
 # ==========================================
 [data]
-    name  = "{{ promptStringOnce . "name"  "Git 提交者姓名" }}"
-    email = "{{ promptStringOnce . "email" "Git 提交者邮箱" }}"
+    name  = {{ promptStringOnce . "name" "Git 提交者姓名" | quote }}
+    email = {{ promptStringOnce . "email" "Git 提交者邮箱" | quote }}

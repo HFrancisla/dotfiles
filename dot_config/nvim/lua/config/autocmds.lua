@@ -13,6 +13,17 @@ vim.api.nvim_create_autocmd('FileType', {
   command = 'setlocal formatoptions-=c formatoptions-=r formatoptions-=o'
 })
 
+-- Lua 缩进与 stylua.toml 一致；其他语言仍使用全局 4 空格。
+vim.api.nvim_create_autocmd("FileType", {
+  group = my_augroup,
+  pattern = "lua",
+  callback = function()
+    vim.bo.tabstop = 2
+    vim.bo.softtabstop = 2
+    vim.bo.shiftwidth = 2
+  end,
+})
+
 -- 差异对比命令
 if vim.fn.exists(":DiffOrig") == 0 then
   vim.cmd([[
@@ -20,23 +31,27 @@ if vim.fn.exists(":DiffOrig") == 0 then
   ]])
 end
 
--- 高亮行尾空格（排除 Dashboard 等特殊缓冲区，防止匹配累积）
-vim.api.nvim_set_hl(0, 'ExtraWhitespace', { ctermbg = 'red', bg = 'red' })
-vim.api.nvim_create_autocmd({"BufEnter", "InsertLeave"}, {
+-- 高亮行尾空格，仅用于普通缓冲区；match 属于窗口而非缓冲区。
+local function whitespace_highlight()
+  vim.api.nvim_set_hl(0, "ExtraWhitespace", { ctermbg = "red", bg = "red" })
+end
+whitespace_highlight()
+vim.api.nvim_create_autocmd("ColorScheme", {
   group = my_augroup,
-  pattern = "*",
+  callback = whitespace_highlight,
+})
+vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
+  group = my_augroup,
   callback = function()
-    local bt = vim.bo.buftype
-    if bt == "nofile" or bt == "prompt" or bt == "terminal" then
+    if vim.w.extra_whitespace_match then
+      pcall(vim.fn.matchdelete, vim.w.extra_whitespace_match)
+      vim.w.extra_whitespace_match = nil
+    end
+    if vim.bo.buftype ~= "" then
       return
     end
-    pcall(function()
-      if vim.w.extra_whitespace_match then
-        vim.fn.matchdelete(vim.w.extra_whitespace_match)
-      end
-    end)
-    vim.w.extra_whitespace_match = vim.fn.matchadd('ExtraWhitespace', [[\s\+$]])
-  end
+    vim.w.extra_whitespace_match = vim.fn.matchadd("ExtraWhitespace", [[\s\+$]])
+  end,
 })
 
 -- --- 一键清除行尾多余空格 ---

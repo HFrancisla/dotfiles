@@ -6,7 +6,8 @@
 alias vim="nvim"
 alias zshcfg="chezmoi edit ~/.config/zsh/.zshrc"      # 快速编辑 zsh 主配置
 alias aliascfg="chezmoi edit ~/.config/zsh/alias.zsh" # 快速编辑此别名文件
-alias reload="source \$ZDOTDIR/.zshrc && echo 'Zsh config reloaded!'" 
+# 以全新的 Zsh 进程加载 .zshenv 与 .zshrc，避免重复注册插件 hooks。
+alias reload='exec env -u ZDOTDIR zsh'
 
 # -------------------- 2. 现代工具集成 --------------------
 # eza: 下一代 ls (Rust 编写)
@@ -70,7 +71,17 @@ mrun() {
 # 基础操作 (OMZ git 插件已提供 gst, gco, ga, gcmsg 等)
 alias gcl1="git clone --depth=1"              # 浅克隆：仅拉取最新一次提交 (加速查看开源代码)
 alias gundo="git reset HEAD~1 --mixed"        # 撤销提交，保留代码
-alias gnuke="git clean -df && git reset --hard" # 强制毁灭性重置 (慎用)
+# 先展示影响范围，必须明确确认；不删除 ignored 文件。
+unalias gnuke 2>/dev/null || true
+gnuke() {
+    local root reply
+    root=$(git rev-parse --show-toplevel) || return
+    git -C "$root" status --short --untracked-files=all || return
+    git -C "$root" clean -nd || return
+    read -q "reply?确认丢弃 $root 中所有未提交修改？[y/N] " || { print; return 1; }
+    print
+    git -C "$root" reset --hard && git -C "$root" clean -df
+}
 alias gtree="git log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all"
 
 # fgb: 交互式切换分支 (基于 fzf)
@@ -110,7 +121,7 @@ if command -v docker &> /dev/null; then
     # 格式化列表：ID | 容器名 | 状态 | 镜像
     alias dps="docker ps --format 'table {{ "{{.ID}}" }}\t{{ "{{.Names}}" }}\t{{ "{{.Status}}" }}\t{{ "{{.Image}}" }}'"
     alias dstopall="docker stop \$(docker ps -q)"
-    alias dprune="docker system prune -a -f --volumes" # 清理所有冗余
+    alias dprune="docker system prune -a --volumes" # 清理所有冗余
     
     # fdex: 交互式进入容器终端
     fdex() {
@@ -157,7 +168,7 @@ cdf() {
 #   gpall --all        递归全部层级
 #   gpall <dir>...     指定起点
 #
-# 策略：git pull --ff-only --prune（只快进，绝不自动制造 merge commit）
+# 策略：git pull --no-rebase --no-autostash --ff-only --prune（只快进，绝不自动制造 merge commit）
 #       脏工作区 / 游离 HEAD / 无远端 一律跳过并汇总，不碰你未提交的改动
 #
 # 退出码：0 = 没有仓库失败（含一个都没找到）；1 = 有仓库拉取失败；2 = 参数错误
@@ -191,7 +202,7 @@ gpall() {
 
     while (( $# )); do
         case "$1" in
-            -n)     shift; max_depth="${1-}" ;;
+            -n)     if (( $# < 2 )); then print -u2 "gpall: -n 需要一个非负整数"; return 2; fi; shift; max_depth="$1" ;;
             -n<->)  max_depth="${1#-n}" ;;
             --all)  max_depth=999 ;;
             --)     shift; roots+=( "$@" ); break ;;
@@ -220,7 +231,10 @@ gpall() {
         if   [[ "$root" == "$base" ]];   then places+=( "." )
         elif [[ "$root" == "$base"/* ]]; then places+=( "${root#"$base"/}" )
         else                                   places+=( "$root" ); fi
-        [[ -e "$root/.git" ]] && repos+=( "$root" )
+        if [[ -e "$root/.git" ]]; then
+            repos+=( "$root" )
+            continue
+        fi
         found="$(_gpall_walk "$root" 1 "$max_depth")"
         [[ -n "$found" ]] && repos+=( "${(@f)found}" )
     done
@@ -270,7 +284,7 @@ gpall() {
     printf '%s%-*s  %-*s  %s%s\n' "$c_dim" "$w" "REPO" "$bw" "BRANCH" "RESULT" "$c_rst"
 
     # ---- 3. 逐个仓库处理 ----
-    local idx repo branch before after out state color text detail
+    local idx repo branch before after out state color text detail worktree_status remote_list
     local n_upd=0 n_clean=0 n_skip=0 n_fail=0
 
     for idx in {1..${#repos[@]}}; do
@@ -285,19 +299,27 @@ gpall() {
             detail="cannot inspect HEAD: ${branch_errors[idx]%%$'\n'*}"
         elif ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
             # 区分「没有配置任何远端」与「有远端但没设 upstream」，否则修复命令会指错方向
-            if [[ -z "$(git -C "$repo" remote 2>/dev/null)" ]]; then state=SKIP_NO_REMOTE
-            else                                                   state=SKIP_NO_UPSTREAM; fi
-        elif [[ -n "$(git -C "$repo" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+            if ! remote_list="$(git -C "$repo" remote 2>&1)"; then
+                state=FAILED; detail="${remote_list%%$'\n'*}"
+            elif [[ -z "$remote_list" ]]; then state=SKIP_NO_REMOTE
+            else state=SKIP_NO_UPSTREAM; fi
+        elif ! worktree_status="$(git -C "$repo" status --porcelain --untracked-files=all --ignore-submodules=none 2>&1)"; then
+            state=FAILED; detail="${worktree_status%%$'\n'*}"
+        elif [[ -n "$worktree_status" ]]; then
             state=SKIP_DIRTY
         else
             before="$(git -C "$repo" rev-parse HEAD 2>/dev/null)"
-            if out="$(GIT_TERMINAL_PROMPT=0 git -C "$repo" pull --ff-only --prune 2>&1)"; then
+            if out="$(LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C "$repo" pull --no-rebase --no-autostash --ff-only --prune 2>&1)"; then
                 after="$(git -C "$repo" rev-parse HEAD 2>/dev/null)"
                 if [[ "$before" != "$after" ]]; then
                     state=UPDATED
                     detail="+$(git -C "$repo" rev-list --count "$before..$after")"
                 else
-                    state=UPTODATE
+                    if detail="$(git -C "$repo" rev-list --count '@{u}..HEAD' 2>&1)"; then
+                        if (( detail > 0 )); then state=AHEAD; else state=UPTODATE; fi
+                    else
+                        state=FAILED; detail="${detail%%$'\n'*}"
+                    fi
                 fi
             elif [[ "$out" == *"Not possible to fast-forward"* || "$out" == *"diverged"* ]]; then
                 state=DIVERGED
@@ -309,6 +331,7 @@ gpall() {
         case "$state" in
             UPDATED)          color="$c_grn"; text="✓ updated ${detail} commits" ;;
             UPTODATE)         color="$c_dim"; text="✓ already up to date" ;;
+            AHEAD)            color="$c_ylw"; text="⚠ local branch ahead by ${detail} commits" ;;
             SKIP_DIRTY)       color="$c_ylw"; text="⚠ skipped: uncommitted changes" ;;
             SKIP_DETACHED)    color="$c_ylw"; text="⚠ skipped: detached HEAD" ;;
             SKIP_NO_UPSTREAM) color="$c_ylw"; text="⚠ skipped: no upstream branch" ;;
@@ -323,6 +346,7 @@ gpall() {
         case "$state" in
             UPDATED)          (( n_upd += 1 )) ;;
             UPTODATE)         (( n_clean += 1 )) ;;
+            AHEAD)            (( n_skip += 1 )); hints+=( "${disp[idx]}: 本地领先上游，确认后推送" ) ;;
             SKIP_DIRTY)       (( n_skip += 1 )); hints+=( "${disp[idx]}: 有未提交改动 → git -C '${disp[idx]}' status（处理完可重跑 gpall）" ) ;;
             SKIP_DETACHED)    (( n_skip += 1 )); hints+=( "${disp[idx]}: 游离 HEAD → git -C '${disp[idx]}' log -1 --oneline --decorate，核对提交后再切换到目标分支" ) ;;
             SKIP_NO_UPSTREAM) (( n_skip += 1 )); hints+=( "${disp[idx]}: 没有上游分支 → git -C '${disp[idx]}' branch -vv，核对远端分支后再设置 upstream" ) ;;
@@ -352,11 +376,12 @@ gpall() {
 
 
 # -------------------- 11. AGY 多账号启动 --------------------
-# 默认自动批准工具权限；Profile 只隔离配置和凭据，不限制文件访问。
+# 默认保留工具审批；如有需要由调用者显式传入 --dangerously-skip-permissions。
+# Profile 只隔离配置和凭据，不限制文件访问。
 unalias agy agy1 agy2 2>/dev/null || true
 
 agy() {
-    command agy --dangerously-skip-permissions "$@"
+    command agy "$@"
 }
 
 _agy_profile() {
@@ -384,7 +409,7 @@ _agy_profile() {
             --bind "$profile_dir" "$HOME/.gemini" \
             --unsetenv DBUS_SESSION_BUS_ADDRESS \
             --chdir "$PWD" \
-            -- "$agy_bin" --dangerously-skip-permissions "$@"
+            -- "$agy_bin" "$@"
     )
 }
 

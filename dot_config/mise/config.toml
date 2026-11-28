@@ -22,6 +22,11 @@ opencode = "latest"
 # 不自动安装项目中缺失的工具
 auto_install = false
 
+[settings.node]
+# 校验发布包 checksum 及发布方 OpenPGP 签名
+verify = true
+gpg_verify = true
+
 [settings.npm]
 # 使用 npm 安装后端，避免 aube 下载时的 TLS 连接中断
 package_manager = "npm"

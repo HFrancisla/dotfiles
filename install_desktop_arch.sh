@@ -30,6 +30,11 @@ if [ "$(id -u)" = "0" ]; then
 	exit 1
 fi
 
+if ! grep -qx "ID=arch" /etc/os-release; then
+	error "此脚本仅适用于 Arch Linux"
+	exit 1
+fi
+
 if ! command -v yay &>/dev/null; then
 	error "未找到 yay！请先运行 install_arch.sh 安装基础环境及其依赖。"
 	exit 1
@@ -52,6 +57,7 @@ step "正在整理 Hyprland 桌面环境及依赖组件..."
 HYPR_CORE=(
 	hyprland                    # 核心混成器
 	waybar                      # 状态栏
+	swaybg                      # 桌面壁纸
 	hypridle                    # 空闲管理 (锁屏/息屏逻辑)
 	hyprlock                    # 现代锁屏
 	pciutils                    # lspci: GPU 检测与 Waybar GPU 脚本依赖
@@ -167,15 +173,7 @@ step "检测 GPU 类型并配置驱动..."
 LOCAL_CONF="$HOME/.config/hypr/local.lua"
 mkdir -p "$(dirname "$LOCAL_CONF")"
 
-# 初始化本地配置文件
-cat >"$LOCAL_CONF" <<'HEADER'
--- ==========================================
--- Hyprland 机器本地配置 (自动生成)
--- 由 install_desktop_arch.sh 根据当前硬件自动检测并生成
--- 请勿手动编辑此文件，重新运行 install_desktop_arch.sh 将覆盖
--- ==========================================
-HEADER
-
+# 仅在驱动安装与配置验证成功后原子更新 local.lua。
 GPU_INFO=$(lspci)
 HAS_INTEL=false
 HAS_AMD=false
@@ -210,72 +208,67 @@ install_gpu_packages() {
 # --- Intel 核显 ---
 if $HAS_INTEL; then
 	info "检测到 Intel 核显，安装 VA-API iHD 驱动..."
-	install_gpu_packages intel-media-driver
+	install_gpu_packages mesa intel-media-driver libva-intel-driver
 	success "Intel GPU 驱动配置完成。"
 fi
 
 # --- AMD 独显/核显 ---
 if $HAS_AMD; then
 	info "检测到 AMD 显卡，安装 VA-API 驱动..."
-	install_gpu_packages libva-mesa-driver mesa-vdpau
+	install_gpu_packages mesa
 	success "AMD GPU 驱动配置完成。"
 fi
 
 # --- NVIDIA 独显 ---
 if $HAS_NVIDIA; then
-	info "检测到 NVIDIA 显卡，清理可能引起冲突的遗留包..."
-	sudo pacman -Rdd --noconfirm libva-nvidia-driver-git 2>/dev/null || true
-	info "安装 NVIDIA 驱动与 VA-API 兼容层..."
-	kernel_pkg=$(pacman -Qoq "/usr/lib/modules/$(uname -r)" 2>/dev/null | head -n 1 || true)
-	if [ -n "$kernel_pkg" ] && pacman -Si "${kernel_pkg}-headers" &>/dev/null; then
-		install_gpu_packages "${kernel_pkg}-headers"
-	else
-		error "无法自动确定当前内核对应的 headers 包，停止安装 NVIDIA DKMS 驱动"
+	info "检测到 NVIDIA 显卡：保留已有驱动，不自动切换 GPU 驱动系列。"
+	driver_pkg="${NVIDIA_DRIVER_PACKAGE:-}"
+	if [[ -z "$driver_pkg" ]]; then
+		driver_pkg=$(pacman -Qq | awk '/^nvidia(-open)?(-dkms|-lts)?$/ || /^nvidia-[0-9]+xx(-dkms|-lts)?$/ { if (!found++) print }')
+	fi
+	if [[ ! "$driver_pkg" =~ ^nvidia(-open|-[0-9]+xx)?(-dkms|-lts)?$ ]]; then
+		error "请按显卡架构选择 NVIDIA 驱动，例如 NVIDIA_DRIVER_PACKAGE=nvidia-open-dkms bash install_desktop_arch.sh"
+		error "旧显卡可能需要 legacy 驱动，参见 https://wiki.archlinux.org/title/NVIDIA"
 		exit 1
 	fi
-	install_gpu_packages nvidia-open-dkms nvidia-utils libva-nvidia-driver
+	if [[ "$driver_pkg" == *-dkms ]]; then
+		# 系统升级后运行中的 uname -r 可能已过期；按已安装内核枚举 headers。
+		headers=()
+		for pkgbase in /usr/lib/modules/*/pkgbase; do
+			[[ -r "$pkgbase" ]] || continue
+			read -r kernel_pkg <"$pkgbase" || continue
+			pacman -Q "$kernel_pkg" >/dev/null 2>&1 || continue
+			if ! pacman -Si "${kernel_pkg}-headers" >/dev/null 2>&1 &&
+			   ! pacman -Qi "${kernel_pkg}-headers" >/dev/null 2>&1; then
+				error "未找到 $kernel_pkg 对应的 headers，需手动安装后重试"
+				exit 1
+			fi
+			headers+=("${kernel_pkg}-headers")
+		done
+		if (( ${#headers[@]} == 0 )); then
+			error "未找到已安装内核的 headers，停止 DKMS 驱动安装"
+			exit 1
+		fi
+		install_gpu_packages "${headers[@]}"
+	fi
+	# 由选定驱动包声明相匹配的 userspace 依赖；不使用 pacman -Rdd。
+	install_gpu_packages "$driver_pkg"
 	success "NVIDIA GPU 驱动配置完成。"
 fi
 
-# 统一生成 VA-API / NVIDIA 环境变量，避免多 GPU 分支互相覆盖。
-if $HAS_AMD; then
-	{
-		echo ""
-		echo "-- AMD/混合显卡：优先 Mesa radeonsi VA-API"
-		echo 'hl.env("LIBVA_DRIVER_NAME", "radeonsi")'
-	} >>"$LOCAL_CONF"
-elif $HAS_INTEL; then
-	{
-		echo ""
-		echo "-- Intel/混合显卡：优先 Intel iHD VA-API"
-		echo 'hl.env("LIBVA_DRIVER_NAME", "iHD")'
-	} >>"$LOCAL_CONF"
-elif $HAS_NVIDIA; then
-	{
-		echo ""
-		echo "-- 纯 NVIDIA：启用 NVIDIA VA-API/GLX"
-		echo 'hl.env("LIBVA_DRIVER_NAME", "nvidia")'
-		echo 'hl.env("NVD_BACKEND", "direct")'
-		echo 'hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")'
-	} >>"$LOCAL_CONF"
+# Hyprland / Chrome / VA-API 默认按硬件和驱动自动选择，不全局强制 GPU。
+# 保留 local.lua 作为机器专属覆盖点；只替换旧脚本生成的内容。
+if [[ -s "$LOCAL_CONF" ]] && ! grep -Fq 'Hyprland 机器本地配置 (自动生成)' "$LOCAL_CONF"; then
+	info "保留手动维护的 $LOCAL_CONF"
+else
+	GENERATED_DIR=$(mktemp -d)
+	trap 'rm -rf -- "$GENERATED_DIR"' EXIT
+	mkdir -p "$GENERATED_DIR/hypr"
+	cat >"$GENERATED_DIR/hypr/local.lua" <<'HEADER'
+-- Hyprland 机器本地配置 (自动生成)
+-- 默认由应用及驱动选择 GPU；仅在确认机器需要特殊设置时添加覆盖。
+HEADER
 fi
-
-if $HAS_NVIDIA && { $HAS_INTEL || $HAS_AMD; }; then
-	{
-		echo ""
-		echo "-- NVIDIA 混合显卡：不设置全局 GBM/GLX 强制变量，由 Hyprland/应用自行选择 GPU。"
-	} >>"$LOCAL_CONF"
-fi
-
-if ! $HAS_INTEL && ! $HAS_AMD && ! $HAS_NVIDIA; then
-	info "未检测到已知 GPU 类型 (Intel/AMD/NVIDIA)，跳过驱动安装。"
-	{
-		echo ""
-		echo "-- 未检测到特定 GPU，无需额外配置"
-	} >>"$LOCAL_CONF"
-fi
-
-success "GPU 检测与本地配置生成完成: $LOCAL_CONF"
 
 # -------------------- 检查音频服务 --------------------
 step "检查并激活 Pipewire 音频服务"
@@ -286,7 +279,7 @@ success "音频服务配置完成。"
 step "验证桌面环境"
 
 DESKTOP_COMMANDS=(
-	Hyprland start-hyprland waybar hypridle hyprlock
+	Hyprland start-hyprland waybar hypridle hyprlock swaybg
 	anyrun grimblast wtype mako wlogout grim slurp wl-copy cliphist
 	kitty thunar clash-verge
 	wpctl pavucontrol playerctl brightnessctl fcitx5
@@ -309,9 +302,23 @@ if [ ! -x /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 ]; then
 	exit 1
 fi
 
-if ! Hyprland --verify-config -c "$HOME/.config/hypr/hyprland.lua"; then
-	error "Hyprland 配置验证失败"
+hypr_version=$(pacman -Q hyprland | awk '{print $2}')
+if (( $(vercmp "$hypr_version" 0.57.0) < 0 )); then
+	error "此配置需要 Hyprland >= 0.57.0，已安装 $hypr_version"
 	exit 1
+fi
+
+# 用临时 XDG 配置目录验证待生成的 local.lua，不覆盖现有配置。
+if [[ -n "${GENERATED_DIR:-}" ]]; then
+	if ! XDG_CONFIG_HOME="$GENERATED_DIR" Hyprland --verify-config -c "$HOME/.config/hypr/hyprland.lua"; then
+		error "Hyprland 配置验证失败；保留现有 local.lua"
+		exit 1
+	fi
+	LOCAL_TMP=$(mktemp "$LOCAL_CONF.XXXXXX")
+	cp "$GENERATED_DIR/hypr/local.lua" "$LOCAL_TMP"
+	mv -f -- "$LOCAL_TMP" "$LOCAL_CONF"
+else
+	Hyprland --verify-config -c "$HOME/.config/hypr/hyprland.lua"
 fi
 
 success "Hyprland 配置与桌面命令验证通过。"

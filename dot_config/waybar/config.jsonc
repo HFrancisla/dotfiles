@@ -28,7 +28,6 @@
     "hyprland/workspaces": {
         "disable-scroll": true,
         "all-outputs": true,
-        "warp-on-scroll": false,
         "format": "{icon}",
         "format-icons": {
             "1": "",
@@ -39,23 +38,7 @@
             "urgent": "",
             "active": "",
             "default": ""
-        },
-        "window-rewrite": {
-            "class<firefox>": "",
-            "class<chromium>": "",
-            "class<google-chrome>": "",
-            "class<Code>": "",
-            "class<code>": "",
-            "class<kitty>": "",
-            "class<Alacritty>": "",
-            "class<foot>": "",
-            "class<thunar>": "",
-            "class<Spotify>": "",
-            "class<discord>": "",
-            "class<telegram>": "",
-            "class<microsoft-edge>": ""
-        },
-        "window-rewrite-default": ""
+        }
     },
     "hyprland/window": {
         "format": "👉 {}",

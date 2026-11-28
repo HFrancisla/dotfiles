@@ -20,6 +20,8 @@ hl.monitor({
 -- Autostart
 -- ---------------------------------------------------------------------------
 hl.on("hyprland.start", function()
+  hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
+  hl.exec_cmd("swaybg -i \"$HOME/.config/wallpapers/wallpaper.png\" -m fill")
   hl.exec_cmd("fcitx5 -d")
   hl.exec_cmd("mako")
   hl.exec_cmd("waybar")
@@ -32,8 +34,6 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("wl-paste --type text --watch cliphist store")
   hl.exec_cmd("wl-paste --type image --watch cliphist store")
 
-  -- Make the Wayland session visible to systemd/dbus activated services.
-  hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
 end)
 
 -- ---------------------------------------------------------------------------
@@ -93,8 +93,7 @@ hl.config({
     enabled = true,
   },
   misc = {
-    force_default_wallpaper = -1,
-    disable_hyprland_logo = false,
+    disable_hyprland_logo = true,
     focus_on_activate = true,
     on_focus_under_fullscreen = 2,
   },

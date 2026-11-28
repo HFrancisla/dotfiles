@@ -16,7 +16,7 @@ no_sound = true
 show_scrollbar = true
 last_row_search = true
 progressive_load_mode = true
-empty_string_is_null = true
+empty_string_is_null = false
 
 # --- 边框 ---
 # 0=无边框  1=单线  2=双线

@@ -86,24 +86,11 @@ disabled = false
 format = '[$status](fg:red) '
 
 [character]
-# 默认即是 Insert 模式
+# Zsh 使用 Emacs 键绑定
 success_symbol = "[▸](fg:arrow)"
 error_symbol = "[▸](fg:arrow)[✘](fg:red)"
 
-{{ if eq .chezmoi.os "linux" -}}
-# ==========================================
-# Starship Vi Mode Prompt Configuration in Linux
-# ==========================================
-# Normal (Command) 模式的符号
-vimcmd_symbol = "[◂](fg:blue)"
 
-# Visual 模式的符号 (例如在 Normal 模式下按 v 选中文字时)
-vimcmd_visual_symbol = "[◂](fg:yellow)"
-
-# Replace 模式的符号 (例如按 R 进入替换模式时)
-vimcmd_replace_symbol = "[◂](fg:red)"
-vimcmd_replace_one_symbol = "[◂](fg:red)"
-{{- end }}
 
 [directory]
 format = "[$read_only]($read_only_style)[$path](bold $style) "
