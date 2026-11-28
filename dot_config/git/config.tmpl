@@ -3,24 +3,18 @@
     email = {{ .email | quote }}
 
 [core]
-    # 指定全局忽略文件位置
     excludesfile = ~/.config/git/ignore
 
-    # 设置默认编辑器
     editor = nvim
 
-    autocrlf = input    # 提交时转换为 LF，检出时不转换
-    compression = 9     # 最高压缩率 (CPU 换流量)
-    
-    # fsync = none      # 虽然速度快，但断电可能导致仓库损坏。建议保持默认。
+    autocrlf = input
+    compression = 9
+
     pager = diff-so-fancy | less --tabs=4 -RFX
 
 [commit]
-    # 指定模板文件位置
     template = ~/.config/git/template
-    # 提交时在编辑器下方显示代码差异，有助于写出准确的描述
     verbose = true
-    # gpgSign = true    # 如果你有 GPG Key，取消注释此行
 
 [advice]
     addEmptyPathspec = false
@@ -33,7 +27,7 @@
 
 [diff]
     context = 3
-    renames = copies    # 检测复制操作
+    renames = copies
     interHunkContext = 10
 
 [init]
@@ -50,23 +44,21 @@
     showUntrackedFiles = all
 
 [push]
-    autoSetupRemote = true  # 自动关联远程分支
+    autoSetupRemote = true
     default = simple
     followTags = true
 
 [pull]
-    rebase = true           # 拉取时使用 Rebase 保持历史整洁
+    rebase = true
 
 [rebase]
-    autoStash = true        # Rebase 前自动暂存，结束后自动恢复
+    autoStash = true
 
 [credential]
-    # 凭据仅缓存在内存，避免将 token 明文写入磁盘
+    # 仅使用一小时的内存凭据缓存。
     helper =
     helper = cache --timeout=3600
 
-
-# --- 颜色与视觉配置 ---
 [color "branch"]
     current  = magenta
     local    = default
@@ -89,7 +81,6 @@
 [diff-so-fancy]
     markEmptyLines = false
 
-# --- 实用缩写 (Shortcuts) ---
 [url "git@github.com:"]
     insteadOf = "gh:"
 

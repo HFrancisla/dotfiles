@@ -4,11 +4,7 @@ set -eu
 marker='# dotfiles: shared SSH defaults'
 include_line='Include ~/.ssh/config.d/10-dotfiles.conf'
 
-# chezmoi passes the current ~/.ssh/config on stdin and uses stdout as the
-# desired file content. First remove the exact legacy Host * stanza that older
-# versions of these dotfiles owned as a whole file. The match is deliberately
-# strict: any added directive or changed value means the stanza is user-owned
-# and must be preserved.
+# 仅删除旧版本精确生成的 Host * 段；任何改动都视为用户配置并保留。
 awk '
     function trim(value) {
         sub(/^[[:space:]]+/, "", value)
@@ -74,8 +70,7 @@ awk '
         flush()
     }
 ' |
-# Then keep every unrelated stanza, remove any previous dotfiles-owned managed
-# block, trim only trailing blank lines, and append one canonical block at EOF.
+# 删除旧托管块和重复 Include，最后追加唯一托管块。
 awk -v marker="$marker" -v inc="$include_line" '
     function trim(value) {
         sub(/^[[:space:]]+/, "", value)
@@ -129,17 +124,14 @@ awk -v marker="$marker" -v inc="$include_line" '
         }
 
         if (state == 2) {
-            # A marker followed by Host * but not by the managed Include is a
-            # damaged/edited block. Preserve that Host context so unexpected
-            # user directives do not silently change meaning.
+            # 不完整托管块保留 Host 上下文，避免改变后续指令语义。
             emit("Host *", "Host *")
             blanks = blanks managed_blanks
             state = 0
             managed_blanks = ""
         }
 
-        # The Include path itself is owned by dotfiles, so collapse duplicates
-        # even if the marker was manually removed.
+        # Include 由 dotfiles 管理，统一去重。
         if (normalized == inc) {
             next
         }
@@ -148,8 +140,7 @@ awk -v marker="$marker" -v inc="$include_line" '
     }
 
     END {
-        # Intentionally discard pending trailing blank lines and normalize the
-        # separator before the managed block to exactly one empty line.
+        # 丢弃尾部空行，并在托管块前保留一个空行。
         if (wrote) {
             print ""
         }

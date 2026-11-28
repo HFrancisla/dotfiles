@@ -1,19 +1,8 @@
 #!/bin/bash
-# ==============================================================================
-# Dotfiles One-Click Deployment Script (chezmoi) — Ubuntu / WSL2
-# ==============================================================================
-# 支持的环境:
-#   - Ubuntu 原生环境 (使用 Homebrew)
-#   - Ubuntu on WSL2
-#
-# 用法:
-#   curl -fsSL <raw_url>/install_ubuntu_wsl.sh | bash
-#   或者 clone 后直接执行: bash install_ubuntu_wsl.sh
-# ==============================================================================
+# Ubuntu / WSL bootstrap。可在仓库中直接执行，也可从 raw URL 管道执行。
 
 set -Eeuo pipefail
 
-# -------------------- 环境检查 --------------------
 if ((BASH_VERSINFO[0] < 4)); then
 	echo -e "\033[0;31m[ERROR]\033[0m 此脚本需要 Bash 4.0+，当前版本: $BASH_VERSION" >&2
 	exit 1
@@ -21,7 +10,6 @@ fi
 
 trap 'echo -e "\033[0;31m[ERROR]\033[0m 安装过程中发生错误 (行 $LINENO)，请检查输出信息" >&2; exit 1' ERR
 
-# -------------------- 颜色与日志工具 --------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -36,13 +24,11 @@ warn() { echo -e "${YELLOW}[WARN]${NC}    $*"; }
 error() { echo -e "${RED}[ERROR]${NC}   $*" >&2; }
 step() { echo -e "\n${CYAN}${BOLD}▸ $*${NC}"; }
 
-# 安装过程中需要普通用户的 HOME 及配置；特权操作由 sudo 单独执行。
 if (( EUID == 0 )); then
 	error "请以普通用户运行安装脚本，不要使用 sudo bash"
 	exit 1
 fi
 
-# -------------------- OS 检测 --------------------
 detect_os() {
 	if [ -f /etc/os-release ]; then
 		. /etc/os-release
@@ -67,7 +53,6 @@ detect_os() {
 	fi
 }
 
-# -------------------- 基础依赖检查与安装 --------------------
 install_prerequisites() {
 	step "检查基础依赖 (git, curl, zsh, build-essential)"
 
@@ -86,7 +71,6 @@ install_prerequisites() {
 	success "基础依赖已就绪"
 }
 
-# -------------------- 安装 Homebrew --------------------
 install_homebrew() {
 	step "检查 Homebrew"
 
@@ -98,7 +82,6 @@ install_homebrew() {
 	info "正在安装 Homebrew..."
 	NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-	# 加载 Homebrew 到当前 shell
 	if [ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
 		eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 	fi
@@ -106,98 +89,89 @@ install_homebrew() {
 	success "Homebrew 安装完成"
 }
 
-# -------------------- 安装核心工具包 --------------------
 install_packages() {
 	step "安装核心工具包"
 
 	info "更新 Homebrew 软件源..."
 	brew update --quiet
 
-	# ---- 1. 核心终端增强 ----
 	local CORE_PACKAGES=(
-		chezmoi  # dotfiles 管理
-		git      # OpenSSL 版 git (替代 Ubuntu 系统的 GnuTLS 版，避免 WSL TLS 握手失败)
-		neovim   # 编辑器
-		tmux     # 终端复用器
-		starship # Shell 提示符
-		fzf      # 模糊搜索
-		yazi     # 终端文件管理器
+		chezmoi
+		git
+		neovim
+		tmux
+		starship
+		fzf
+		yazi
 	)
 
-	# ---- 2. 现代 CLI 替代 (coreutils 增强) ----
 	local MODERN_CLI_PACKAGES=(
-		eza      # ls 替代 (图标/颜色)
-		zoxide   # cd 替代 (智能跳转)
-		bat      # cat 替代 (语法高亮)
-		ripgrep  # grep 替代 (极速搜索)
-		fd       # find 替代
-		sd       # sed 替代
-		dust     # du 替代 (磁盘用量可视化)
-		duf      # df 替代 (磁盘空间)
-		procs    # ps 替代
-		gping    # ping 替代 (图形化)
-		tealdeer # tldr (命令速查)
+		eza
+		zoxide
+		bat
+		ripgrep
+		fd
+		sd
+		dust
+		duf
+		procs
+		gping
+		tealdeer
 	)
 
-	# ---- 3. 系统监控 & 网络 ----
 	local MONITOR_PACKAGES=(
-		btop      # 系统资源监控 (TUI)
-		htop      # 进程监控
-		bottom    # 系统监控 (Rust)
-		fastfetch # 系统信息展示
-		gdu       # 磁盘空间分析 (Go)
-		ncdu      # 磁盘空间分析 (ncurses)
-		bandwhich # 网络带宽监控
-		trippy    # 网络路由诊断
-		mtr       # 网络诊断 (ping + traceroute)
-		progress  # coreutils 命令进度监控
+		btop
+		htop
+		bottom
+		fastfetch
+		gdu
+		ncdu
+		bandwhich
+		trippy
+		mtr
+		progress
 	)
 
-	# ---- 4. 开发工具 ----
 	local DEV_PACKAGES=(
-		llvm          # 编译工具链 (.zshrc 中配置了 PATH)
-		mise          # 多语言版本管理 (Node/Lua/Python/Java/Go + CLI)
-		shellcheck    # Shell 静态分析 (scripts/check.sh 依赖)
-		gh            # GitHub CLI (Homebrew 包名)
-		lazygit       # Git TUI (LazyVim 集成)
-		serpl         # 项目级搜索替换 TUI (tmux 快捷键依赖)
-		jq            # JSON 处理
-		yq            # YAML/XML/TOML 处理
-		dasel         # 多格式数据查询/修改 (JSON/YAML/TOML/CSV/XML)
-		xmlstarlet    # XML 处理工具
-		repren        # 多模式批量重命名/替换
-		diff-so-fancy # Git diff 美化
-		git-delta     # Git diff 语法高亮分页器
-		sqlite        # SQLite 库 (Neovim yanky.nvim sqlite.lua 依赖)
-		uv            # Python 包/虚拟环境管理
-		dive          # Docker 镜像分析工具
-		trivy         # Docker 镜像漏洞扫描
+		llvm
+		mise
+		shellcheck
+		gh
+		lazygit
+		serpl
+		jq
+		yq
+		dasel
+		xmlstarlet
+		repren
+		diff-so-fancy
+		git-delta
+		sqlite
+		uv
+		dive
+		trivy
 	)
 
-	# ---- 5. 数据库客户端 ----
 	local DB_PACKAGES=(
-		pgcli  # PostgreSQL 交互客户端
-		mycli  # MySQL 交互客户端
-		iredis # Redis 交互客户端
-		pspg   # 表格 pager
+		pgcli
+		mycli
+		iredis
+		pspg
 	)
 
-	# ---- 6. 文件预览依赖 (Yazi) ----
 	local PREVIEW_PACKAGES=(
-		ffmpeg      # 视频预览/处理
-		imagemagick # 图片预览/处理
-		poppler     # PDF 预览
-		glow        # Markdown 渲染 (Yazi glow 插件依赖)
+		ffmpeg
+		imagemagick
+		poppler
+		glow
 	)
 
-	# ---- 7. 实用工具 ----
 	local UTIL_PACKAGES=(
-		dos2unix # 行尾转换 (WSL 常用)
-		pandoc   # 文档格式转换
-		pv       # 管道进度查看器
+		dos2unix
+		pandoc
+		pv
 	)
 
-	# 合并所有分类
 	local ALL_PACKAGES=(
 		"${CORE_PACKAGES[@]}"
 		"${MODERN_CLI_PACKAGES[@]}"
@@ -206,7 +180,7 @@ install_packages() {
 		"${DB_PACKAGES[@]}"
 		"${PREVIEW_PACKAGES[@]}"
 		"${UTIL_PACKAGES[@]}"
-		sevenzip # Homebrew 包名
+		sevenzip
 	)
 
 	local to_install=()
@@ -244,7 +218,6 @@ install_packages() {
 	success "核心工具包安装完成"
 }
 
-# -------------------- 准备运行时目录 --------------------
 setup_runtime_dirs() {
 	step "准备运行时目录"
 
@@ -254,7 +227,6 @@ setup_runtime_dirs() {
 	success "运行时目录已就绪"
 }
 
-# -------------------- 初始化 mise 运行时 --------------------
 setup_mise() {
 	step "初始化 mise 运行时和 CLI 工具"
 
@@ -285,7 +257,6 @@ setup_mise() {
 	success "mise 工具环境初始化完成"
 }
 
-# -------------------- 安装 Rustup --------------------
 install_rustup() {
 	step "安装 Rustup (Rust 官方工具链)"
 
@@ -301,7 +272,6 @@ install_rustup() {
 		success "Rustup 安装完成"
 	fi
 
-	# 动态加载环境变量以便当前脚本后续命令可用
 	if [ -f "$CARGO_ENV" ]; then
 		# shellcheck source=/dev/null
 		source "$CARGO_ENV"
@@ -313,12 +283,10 @@ install_rustup() {
 	fi
 }
 
-# -------------------- 配置 Neovim 运行环境 --------------------
 setup_neovim_providers() {
 	step "配置 Neovim 运行环境 (Python)"
 
-	# Python 虚拟环境 (通过 uv)
-	# 你的 ~/.config/nvim/lua/config/options.lua 已经指定了 python3_host_prog 路径
+	# options.lua 固定使用该虚拟环境作为 Python provider。
 	local NVIM_VENV="$HOME/.virtualenvs/nvim-python"
 
 	if ! command -v uv &>/dev/null; then
@@ -331,12 +299,10 @@ setup_neovim_providers() {
 		uv venv "$NVIM_VENV" -q
 	fi
 	info "安装 pynvim 到虚拟环境..."
-	# 使用 uv pip install 确保安装在指定的 venv 内
 	uv pip install -p "$NVIM_VENV" pynvim -q
 	success "Python 虚拟环境配置完成"
 }
 
-# -------------------- 安装 Oh My Zsh --------------------
 install_oh_my_zsh() {
 	step "检查 Oh My Zsh"
 
@@ -349,22 +315,19 @@ install_oh_my_zsh() {
 		return 1
 	else
 		info "正在安装 Oh My Zsh..."
-		# --unattended: 隐含 RUNZSH=no 和 CHSH=no (不切换 shell、不启动 zsh)
-		# --keep-zshrc: 不覆盖已有的 .zshrc
+		# 不启动 Zsh、不切换默认 shell，也不覆盖现有 .zshrc。
 		sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" \
 			--unattended --keep-zshrc
 		success "Oh My Zsh 安装完成"
 	fi
 
-	# 安装 Zsh 第三方插件
 	install_zsh_plugins
 }
 
-# -------------------- 安装 Zsh 第三方插件 --------------------
 install_zsh_plugins() {
 	step "安装 Zsh 第三方插件"
 
-	# 其他系统: clone 到 Oh My Zsh custom plugins 目录
+	# Ubuntu 将第三方插件安装到 OMZ custom 目录。
 	local ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 	local plugins_dir="$ZSH_CUSTOM/plugins"
 	mkdir -p "$plugins_dir"
@@ -410,7 +373,6 @@ install_zsh_plugins() {
 	success "Zsh 插件安装完成"
 }
 
-# -------------------- 安装 Tmux Plugin Manager (TPM) --------------------
 install_tpm() {
 	step "检查 Tmux Plugin Manager (TPM)"
 
@@ -430,7 +392,6 @@ install_tpm() {
 	fi
 }
 
-# -------------------- 使用 chezmoi 应用 dotfiles --------------------
 apply_dotfiles() {
 	step "使用 chezmoi 应用 dotfiles"
 
@@ -496,7 +457,6 @@ apply_dotfiles() {
 	fi
 }
 
-# -------------------- 安装 Yazi 插件 --------------------
 install_yazi_plugins() {
 	step "安装 Yazi 插件"
 
@@ -511,7 +471,6 @@ install_yazi_plugins() {
 	success "Yazi 插件安装完成"
 }
 
-# -------------------- 设置默认 Shell 为 Zsh --------------------
 set_default_shell() {
 	step "检查默认 Shell"
 
@@ -525,7 +484,6 @@ set_default_shell() {
 		return 0
 	fi
 
-	# 确保 zsh 在 /etc/shells 中
 	if ! grep -q "$zsh_path" /etc/shells 2>/dev/null; then
 		info "将 $zsh_path 添加到 /etc/shells ..."
 		echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
@@ -543,7 +501,6 @@ set_default_shell() {
 	fi
 }
 
-# -------------------- 安装 Tmux 插件 --------------------
 install_tmux_plugins() {
 	step "安装 Tmux 插件"
 
@@ -560,7 +517,6 @@ install_tmux_plugins() {
 	success "Tmux 插件安装完成"
 }
 
-# -------------------- 最终验证 --------------------
 post_install_check() {
 	step "安装验证"
 
@@ -581,7 +537,7 @@ post_install_check() {
 		rustup cargo rustc clippy-driver rust-analyzer
 	)
 
-	# 有多个可能命令名的工具 (主命令|备选命令)
+	# 验证可能因发行版版本不同而改名的命令。
 	local tools_with_alt=(
 		"gdu|gdu-go"     # gdu vs gdu-go (Homebrew Linux 可能避免与 coreutils du 冲突)
 		"magick|convert" # ImageMagick v7 vs v6
@@ -633,7 +589,6 @@ post_install_check() {
 	fi
 }
 
-# -------------------- 打印安装摘要 --------------------
 print_summary() {
 	echo ""
 	echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
@@ -653,7 +608,6 @@ print_summary() {
 	echo ""
 }
 
-# ==================== 主流程 ====================
 main() {
 	echo ""
 	echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
@@ -666,7 +620,7 @@ main() {
 	install_homebrew
 	install_packages
 	setup_runtime_dirs
-	# 将 apply_dotfiles 提前，确保后续步骤能读取到配置 (如 config.toml, package.toml 等)
+	# 后续步骤依赖已部署的 mise/Yazi 配置。
 	apply_dotfiles
 	setup_mise
 	install_rustup

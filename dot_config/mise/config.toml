@@ -1,32 +1,27 @@
 [tools]
-# 语言运行时
 node = "lts"
 lua = "5.1"
 python = "3.13"
 java = "temurin-21"
 go = "latest"
 
-# 开发工具（独立管理，不安装到 Node.js 的全局 npm 目录）
 pnpm = "latest"
 tree-sitter = "latest"
 "npm:neovim" = "latest"
 "npm:@mermaid-js/mermaid-cli" = "latest"
 
-# AI CLI
 opencode = "latest"
 "npm:@earendil-works/pi-coding-agent" = "latest"
 "npm:@voyager-crew/cli" = "latest"
 "npm:@getpaseo/cli" = "latest"
 
 [settings]
-# 不自动安装项目中缺失的工具
 auto_install = false
 
 [settings.node]
-# 校验发布包 checksum 及发布方 OpenPGP 签名
 verify = true
 gpg_verify = true
 
 [settings.npm]
-# 使用 npm 安装后端，避免 aube 下载时的 TLS 连接中断
+# npm: 工具统一使用 npm 安装。
 package_manager = "npm"

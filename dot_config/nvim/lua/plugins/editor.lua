@@ -1,5 +1,4 @@
 return {
-  -- yanky: 剪贴板历史增强（keys 和 opts 由 coding.yanky extra 提供，此处仅做自定义覆盖）
   {
     "gbprod/yanky.nvim",
     opts = {
@@ -7,7 +6,6 @@ return {
     },
   },
 
-  -- tmux-navigator: Tmux & Neovim 窗口无缝跳转
   {
     "christoomey/vim-tmux-navigator",
     cmd = {
@@ -25,7 +23,6 @@ return {
     },
   },
 
-  -- fugitive: Git 深度集成
   {
     "tpope/vim-fugitive",
     cmd = { "Git", "Gdiffsplit", "Gvdiffsplit" },

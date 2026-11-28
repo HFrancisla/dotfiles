@@ -99,6 +99,11 @@ grep -q 'wallpapers/lock.jpg' "$a/.config/hypr/hyprlock.conf"
 grep -q 'wallpapers/wallpaper.png' "$a/.config/hypr/hyprland.lua"
 grep -Fq 'hl.env("XMODIFIERS", "@im=fcitx")' "$a/.config/hypr/hyprland.lua"
 grep -Fq 'hl.env("QT_IM_MODULE", "fcitx")' "$a/.config/hypr/hyprland.lua"
+! grep -Fq 'ELECTRON_OZONE_PLATFORM_HINT' "$a/.config/hypr/hyprland.lua"
+! grep -Fq 'hl.env("OZONE_PLATFORM"' "$a/.config/hypr/hyprland.lua"
+grep -qx -- '--ozone-platform=wayland' "$a/.config/chrome-flags.conf"
+grep -qx -- '--enable-wayland-ime' "$a/.config/chrome-flags.conf"
+! grep -q '^[[:space:]]*#' "$a/.config/chrome-flags.conf"
 "${ubuntu[@]}" apply
 "${arch[@]}" apply
 test "$(grep -c 'Include.*10-dotfiles.conf' "$a/.ssh/config")" = 1
@@ -141,7 +146,7 @@ printf '0x8086\n' >"$tmp/drm/card1/device/vendor"
 printf '42\n' >"$tmp/drm/card1/device/gpu_busy_percent"
 test "$(PATH="$tmp/bin:$PATH" GPU_MOCK=N/A "$gpu")" = '42%'
 
-echo '[4] Zsh PATH, proxy and Git workflow'
+echo '[4] Zsh PATH, aliases, proxy and Git workflow'
 zsh -f -c '
   source "$1"
   first=$PATH
@@ -159,7 +164,7 @@ env -u ZDOTDIR HOME="$tmp/zhome" zsh -c '
     unset DOTFILES_ENV_LOADED
     zsh -c "test \"\$DOTFILES_ENV_LOADED\" = 1"
 '
-sed -n '/^proxy() {/,/^# conda 镜像切换/p' dot_config/zsh/dot_zshrc >"$tmp/proxy.zsh"
+awk '/^proxy\(\) {/{copy=1} /^conda-mirror\(\) {/{copy=0} copy' dot_config/zsh/dot_zshrc >"$tmp/proxy.zsh"
 # Synthetic WSL + NAT/mirrored, regardless of the host running this test.
 cat >"$tmp/bin/grep" <<'SH'
 #!/bin/sh
@@ -185,6 +190,22 @@ PATH="$tmp/bin:$PATH" zsh -f -c '
     unproxy >/dev/null
     [[ -z "${http_proxy+x}${HTTP_PROXY+x}${all_proxy+x}${ALL_PROXY+x}" ]]
 ' _ "$tmp/proxy.zsh"
+
+cat >"$tmp/bin/matlab" <<'SH'
+#!/bin/sh
+printf '<%s>\n' "$@"
+SH
+cp "$tmp/bin/matlab" "$tmp/bin/matlab.exe"
+chmod +x "$tmp/bin/"{matlab,matlab.exe}
+PATH="$tmp/bin:$PATH" zsh -f -c '
+    source "$1"
+    alias -s tar >/dev/null
+    alias -s tgz >/dev/null
+    ! alias -s tar.gz >/dev/null 2>&1
+    out=$(mrun "disp(1); exit") || exit 1
+    [[ "$out" == *"<-r>"* && "$out" == *"<disp(1); exit>"* ]] || exit 1
+    ! mrun one two >/dev/null 2>&1
+' _ "$u/.config/zsh/alias.zsh"
 
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.invalid

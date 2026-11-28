@@ -1,10 +1,8 @@
-// ~/.config/waybar/config.jsonc
 {
     "layer": "top",
     "position": "top",
     "height": 16,
     "spacing": 2,
-
     "modules-left": [
         "hyprland/workspaces",
         "hyprland/window"
@@ -15,16 +13,14 @@
     "modules-right": [
         "tray",
         "idle_inhibitor",
-		"cpu",
-		"custom/gpu",
+        "cpu",
+        "custom/gpu",
         "pulseaudio",
         "network",
         "backlight",
         "battery",
         "custom/power"
     ],
-
-    // --- 模块详细配置 ---
     "hyprland/workspaces": {
         "disable-scroll": true,
         "all-outputs": true,
@@ -60,7 +56,17 @@
     },
     "backlight": {
         "format": "{percent}% {icon}",
-        "format-icons": ["", "", "", "", "", "", "", "", ""]
+        "format-icons": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+        ]
     },
     "battery": {
         "states": {
@@ -68,10 +74,16 @@
             "critical": 15
         },
         "format": "{capacity}% {icon}",
-		"format-charging": "{capacity}% ",
-		"format-plugged": "{capacity}% ",
-		"format-alt": "{time} {icon}",
-		"format-icons": ["", "", "", "", ""]
+        "format-charging": "{capacity}% ",
+        "format-plugged": "{capacity}% ",
+        "format-alt": "{time} {icon}",
+        "format-icons": [
+            "",
+            "",
+            "",
+            "",
+            ""
+        ]
     },
     "network": {
         "format-wifi": "{essid} ({signalStrength}%) ",
@@ -88,32 +100,34 @@
         "format-source-muted": "",
         "format-icons": {
             "headphone": "",
-            "default": ["", "", ""]
+            "default": [
+                "",
+                "",
+                ""
+            ]
         },
         "on-click": "pavucontrol"
     },
     "custom/power": {
-        "format" : "⏻",
+        "format": "⏻",
         "tooltip": false,
-        "on-click": "wlogout" // 推荐使用 wlogout 替代纯文本菜单
+        "on-click": "wlogout"
     },
-	"cpu": {
-    "interval": 2,
-    "format": "{usage}% ",
-    /* 定义状态阈值 */
-    "states": {
-        "warning": 70,   // 当 CPU 使用率超过 70% 时，应用 .warning 样式
-        "critical": 90   // 当 CPU 使用率超过 90% 时，应用 .critical 样式
+    "cpu": {
+        "interval": 2,
+        "format": "{usage}% ",
+        "states": {
+            "warning": 70,
+            "critical": 90
+        },
+        "min-length": 7,
+        "align": 0.5
     },
-    /* 配合之前的对齐优化 */
-    "min-length": 7,
-    "align": 0.5
-	},
     "custom/gpu": {
         "exec": "~/.config/waybar/scripts/gpu-usage.sh",
         "format": "{} 󰢮",
         "interval": 2,
-		"min-length": 7,
-		"align": 0.5
+        "min-length": 7,
+        "align": 0.5
     }
 }

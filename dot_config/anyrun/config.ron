@@ -1,35 +1,20 @@
 Config(
-    // ── 位置与尺寸 ──────────────────────────────────────────────────────────
-    // 水平居中
     x: Fraction(0.5),
-    // 垂直位置 (紧贴 waybar 下方)
     y: Absolute(0),
-    // 宽度 (屏幕 45%)
     width: Fraction(0.45),
-    // 最小高度；1px 允许窗口随结果扩展后再次收缩（0 会导致只增不减）
+    // 1px 可让结果窗口扩展后重新收缩；0 会只增不减。
     height: Absolute(1),
 
-    // ── 外观 ────────────────────────────────────────────────────────────────
-    // 显示匹配结果和插件信息的图标
     hide_icons: false,
-    // 显示底部插件信息面板
     hide_plugin_info: false,
-    // 忽略排他区域 (如 Waybar 占用的区域)
     ignore_exclusive_zones: false,
-    // 层级: Background, Bottom, Top, Overlay
     layer: Overlay,
 
-    // ── 行为 ────────────────────────────────────────────────────────────────
-    // 点击外部关闭
     close_on_click: true,
-    // 启动时立即显示结果；剪贴板 stdin 调用需要立即展示已有输入
+    // 剪贴板 stdin 调用需要立即展示输入。
     show_results_immediately: true,
-    // 最大结果条数 (None = 不限制)
     max_entries: None,
 
-    // ── 插件列表 ────────────────────────────────────────────────────────────
-    // 插件从 <config_dir>/plugins/ 或绝对路径加载
-    // 排列顺序决定结果的优先级
     plugins: [
         "libapplications.so",
         "libshell.so",

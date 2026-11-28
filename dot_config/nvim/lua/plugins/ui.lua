@@ -1,5 +1,4 @@
 return {
-  -- bufferline: 顶栏增强
   {
     "akinsho/bufferline.nvim",
     event = "VeryLazy",
@@ -28,7 +27,6 @@ return {
     },
   },
 
-  -- sonokai: 色彩主题
   {
     "sainnhe/sonokai",
     lazy = false,
@@ -38,8 +36,7 @@ return {
       vim.g.sonokai_enable_italic = 1
     end,
     config = function()
-      -- colorscheme 由 LazyVim opts.colorscheme 统一加载，此处不再重复调用
-      -- 个性化高亮：使用 ColorScheme autocmd 确保在主题加载/切换后始终生效
+      -- 主题切换后重新应用自定义行号颜色。
       vim.api.nvim_create_autocmd("ColorScheme", {
         pattern = "sonokai",
         callback = function()
@@ -49,7 +46,6 @@ return {
     end,
   },
 
-  -- LazyVim: 全局主题设定
   {
     "LazyVim/LazyVim",
     opts = {

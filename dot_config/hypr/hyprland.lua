@@ -1,14 +1,11 @@
--- Hyprland 0.57+ Lua configuration.
--- Documentation: https://wiki.hypr.land/configuring/
+-- Hyprland >= 0.57 Lua 配置。
 
 local terminal = "kitty"
 local file_manager = "thunar"
 local menu = "anyrun"
 local main_mod = "SUPER"
 
--- ---------------------------------------------------------------------------
--- Monitor
--- ---------------------------------------------------------------------------
+-- 显示器
 hl.monitor({
   output = "",
   mode = "preferred",
@@ -16,9 +13,7 @@ hl.monitor({
   scale = "auto",
 })
 
--- ---------------------------------------------------------------------------
--- Autostart
--- ---------------------------------------------------------------------------
+-- 自启动
 hl.on("hyprland.start", function()
   hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
   hl.exec_cmd("swaybg -i \"$HOME/.config/wallpapers/wallpaper.png\" -m fill")
@@ -30,17 +25,13 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("hypridle")
   hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
 
-  -- Clipboard history.
+  -- 剪贴板历史。
   hl.exec_cmd("wl-paste --type text --watch cliphist store")
   hl.exec_cmd("wl-paste --type image --watch cliphist store")
 
 end)
 
--- ---------------------------------------------------------------------------
--- Environment
--- ---------------------------------------------------------------------------
-hl.env("OZONE_PLATFORM", "wayland")
-hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+-- 环境
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 hl.env("DEFAULT_TARGET_DIR", (os.getenv("HOME") or "") .. "/Pictures/Screenshots")
 hl.env("XCURSOR_SIZE", "24")
@@ -49,16 +40,13 @@ hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
 hl.env("XDG_SESSION_DESKTOP", "Hyprland")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
--- Fcitx5: XIM is still needed by XWayland/generic X11 clients, while Qt5
--- needs the Fcitx IM module on non-KWin Wayland compositors.
+-- XWayland 需要 XIM；Qt5 Wayland 使用 Fcitx IM 模块。
 hl.env("XMODIFIERS", "@im=fcitx")
 hl.env("QT_IM_MODULE", "fcitx")
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 hl.env("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
 
--- ---------------------------------------------------------------------------
--- Look and feel
--- ---------------------------------------------------------------------------
+-- 外观与输入
 hl.config({
   general = {
     gaps_in = 2,
@@ -122,6 +110,7 @@ hl.config({
   },
 })
 
+-- 动画
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
 hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
@@ -146,9 +135,8 @@ hl.animation({ leaf = "workspacesIn", enabled = true, speed = 1.21, bezier = "al
 hl.animation({ leaf = "workspacesOut", enabled = true, speed = 1.94, bezier = "almostLinear", style = "fade" })
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
 
--- ---------------------------------------------------------------------------
--- Workspace rules: remove gaps/borders when only one tiled window is visible.
--- ---------------------------------------------------------------------------
+-- 工作区与手势
+-- 单平铺窗口时去掉间距和边框。
 hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 0, gaps_in = 0 })
 hl.workspace_rule({ workspace = "f[1]", gaps_out = 0, gaps_in = 0 })
 
@@ -172,9 +160,7 @@ hl.gesture({
   action = "workspace",
 })
 
--- ---------------------------------------------------------------------------
--- Keybindings
--- ---------------------------------------------------------------------------
+-- 按键
 hl.bind(main_mod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(main_mod .. " + Q", hl.dsp.window.close())
 hl.bind(main_mod .. " + E", hl.dsp.exec_cmd(file_manager))
@@ -192,20 +178,19 @@ hl.bind(main_mod .. " + P", hl.dsp.window.pseudo())
 hl.bind(main_mod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }))
 hl.bind(main_mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 
--- Tabbed/grouped windows.
+-- 窗口组。
 hl.bind(main_mod .. " + G", hl.dsp.group.toggle())
 hl.bind(main_mod .. " + TAB", hl.dsp.group.next())
 hl.bind(main_mod .. " + SHIFT + TAB", hl.dsp.group.prev())
 
--- Lock screen.
 hl.bind(main_mod .. " + Escape", hl.dsp.exec_cmd("loginctl lock-session"))
 
--- Screenshots.
+-- 截图。
 hl.bind("Print", hl.dsp.exec_cmd("grimblast --freeze --notify copy area"))
 hl.bind("ALT + Print", hl.dsp.exec_cmd("grimblast --freeze --notify copysave area"))
 hl.bind(main_mod .. " + Print", hl.dsp.exec_cmd("grimblast --notify copy output"))
 
--- Clipboard history. Anyrun loads only the stdin plugin for this invocation.
+-- 剪贴板选择器只为本次调用加载 stdin 插件。
 hl.bind(
   main_mod .. " + SHIFT + C",
   hl.dsp.exec_cmd(
@@ -215,7 +200,7 @@ hl.bind(
   )
 )
 
--- Focus and window movement.
+-- 焦点与窗口移动。
 hl.bind(main_mod .. " + H", hl.dsp.focus({ direction = "left" }))
 hl.bind(main_mod .. " + L", hl.dsp.focus({ direction = "right" }))
 hl.bind(main_mod .. " + K", hl.dsp.focus({ direction = "up" }))
@@ -226,13 +211,13 @@ hl.bind(main_mod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
 hl.bind(main_mod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
 hl.bind(main_mod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
 
--- Resize the active window by 20 layout pixels.
+-- 每次调整 20 个布局像素。
 hl.bind(main_mod .. " + left", hl.dsp.window.resize({ x = -20, y = 0, relative = true }), { repeating = true })
 hl.bind(main_mod .. " + right", hl.dsp.window.resize({ x = 20, y = 0, relative = true }), { repeating = true })
 hl.bind(main_mod .. " + up", hl.dsp.window.resize({ x = 0, y = -20, relative = true }), { repeating = true })
 hl.bind(main_mod .. " + down", hl.dsp.window.resize({ x = 0, y = 20, relative = true }), { repeating = true })
 
--- Workspaces 1-10; key 0 maps to workspace 10.
+-- Super+0 对应工作区 10。
 for i = 1, 10 do
   local key = i % 10
   hl.bind(main_mod .. " + " .. key, hl.dsp.focus({ workspace = i }))
@@ -246,7 +231,7 @@ hl.bind(main_mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(main_mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(main_mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Multimedia keys.
+-- 媒体键
 hl.bind(
   "XF86AudioRaiseVolume",
   hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
@@ -282,9 +267,7 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 
--- ---------------------------------------------------------------------------
--- Window and layer rules
--- ---------------------------------------------------------------------------
+-- 窗口与图层规则
 hl.window_rule({
   name = "suppress-maximize-events",
   match = { class = ".*" },
@@ -348,11 +331,8 @@ hl.layer_rule({
   ignore_alpha = 0.5,
 })
 
--- ---------------------------------------------------------------------------
--- Machine-local overrides
--- ---------------------------------------------------------------------------
--- install_desktop_arch.sh writes this file. Missing local overrides are fine,
--- while syntax/runtime errors in an existing file are intentionally surfaced.
+-- 本机覆盖
+-- local.lua 可缺省；存在时的错误不吞掉。
 local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
 local local_config = config_home .. "/hypr/local.lua"
 local local_file = io.open(local_config, "r")

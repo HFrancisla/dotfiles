@@ -24,10 +24,6 @@ $env_var
 $status
 """
 
-
-# Add the modules you need
-
-# Disable the blank line at the start of the prompt
 add_newline = false
 
 palette = "normal"
@@ -37,20 +33,15 @@ arrow = "#c678dd"
 os = "#c678dd"
 os_admin = "#e4ff1a"
 directory = "#e5c07b"
-time = "#bdfffd"
 node = "#a5e6ba"
 git = "#56b6c2"
-git_status = "#DFEBED"
 python = "#edf67d"
 conda = "#70e000"
 java = "#F86279"
 rust = "#ffdac6"
 clang = "#caf0f8"
 duration = "green"
-text_color = "#EDF2F4"
 text_light = "#26272A"
-
-# some modules (Rust, Java...) disabled ,enable them if needed.
 
 [username]
 style_user = 'bold os'
@@ -86,11 +77,8 @@ disabled = false
 format = '[$status](fg:red) '
 
 [character]
-# Zsh 使用 Emacs 键绑定
 success_symbol = "[▸](fg:arrow)"
 error_symbol = "[▸](fg:arrow)[✘](fg:red)"
-
-
 
 [directory]
 format = "[$read_only]($read_only_style)[$path](bold $style) "
@@ -102,12 +90,6 @@ truncation_symbol = "…/"
 truncate_to_repo = false
 read_only = " "
 
-[time]
-disabled = true
-format = "at [󱑈 $time]($style)"
-time_format = "%H:%M"
-style = "bold fg:time"
-
 [cmd_duration]
 format = "[ $duration]($style) "
 style = "bold fg:duration"
@@ -116,22 +98,6 @@ min_time = 1000
 [git_branch]
 format = "[$symbol$branch(:$remote_branch)]($style) "
 style = "bold fg:git"
-
-[git_status]
-format = '[ $all_status$ahead_behind ]($style)'
-style = "fg:text_color bg:git"
-disabled = true
-
-[docker_context]
-disabled = true
-symbol = " "
-
-# Disable the package module, hiding it from the prompt completely
-[package]
-disabled = true
-
-[fill]
-symbol = " "
 
 [nodejs]
 format = "[ $symbol$version ]($style)"

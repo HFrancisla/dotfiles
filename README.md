@@ -76,5 +76,5 @@ bash scripts/check.sh
 不需要 root，不执行实际软件安装、Docker 清理、数据库连接或硬件操作。
 Arch 桌面的驱动、Wayland、Kanata 用户服务及音频等仍需在目标机器上验收。
 
-修改配置模板后，实际部署前先执行 `chezmoi init`，再预览 `chezmoi diff`，
-最后按需执行 `chezmoi apply`。
+修改 `.chezmoi.toml.tmpl` 后先执行 `chezmoi init` 重新生成 chezmoi 自身配置。
+普通 dotfile 模板直接用 `chezmoi diff` 预览，再按需执行 `chezmoi apply`。

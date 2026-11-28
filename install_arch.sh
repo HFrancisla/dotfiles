@@ -1,18 +1,8 @@
 #!/bin/bash
-# ==============================================================================
-# Dotfiles One-Click Deployment Script (chezmoi) — Arch Linux
-# ==============================================================================
-# 支持的环境:
-#   - Arch Linux (使用 yay)
-#
-# 用法:
-#   curl -fsSL <raw_url>/install_arch.sh | bash
-#   或者 clone 后直接执行: bash install_arch.sh
-# ==============================================================================
+# Arch Linux bootstrap。可在仓库中直接执行，也可从 raw URL 管道执行。
 
 set -Eeuo pipefail
 
-# -------------------- 环境检查 --------------------
 if ((BASH_VERSINFO[0] < 4)); then
 	echo -e "\033[0;31m[ERROR]\033[0m 此脚本需要 Bash 4.0+，当前版本: $BASH_VERSION" >&2
 	exit 1
@@ -20,7 +10,6 @@ fi
 
 trap 'echo -e "\033[0;31m[ERROR]\033[0m 安装过程中发生错误 (行 $LINENO)，请检查输出信息" >&2; exit 1' ERR
 
-# -------------------- 颜色与日志工具 --------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -35,13 +24,11 @@ warn() { echo -e "${YELLOW}[WARN]${NC}    $*"; }
 error() { echo -e "${RED}[ERROR]${NC}   $*" >&2; }
 step() { echo -e "\n${CYAN}${BOLD}▸ $*${NC}"; }
 
-# 安装过程中需要普通用户的 HOME 及配置；特权操作由 sudo 单独执行。
 if (( EUID == 0 )); then
 	error "请以普通用户运行安装脚本，不要使用 sudo bash"
 	exit 1
 fi
 
-# -------------------- OS 检测 --------------------
 detect_os() {
 	if [ -f /etc/os-release ]; then
 		. /etc/os-release
@@ -55,14 +42,12 @@ detect_os() {
 		exit 1
 	fi
 
-	# Arch Linux: 确保 /usr/bin 优先，防止用户态 Python 管理器 (mise, linuxbrew 等)
-	# 遮蔽系统 Python，导致 AUR 构建时系统 C 绑定 (如 _gi 模块) 加载失败
+	# AUR 构建固定优先使用系统工具链。
 	export PATH="/usr/bin:$PATH"
 
 	info "检测到操作系统: ${BOLD}${OS_ID}${NC}"
 }
 
-# -------------------- 基础依赖检查与安装 --------------------
 install_prerequisites() {
 	step "检查基础依赖 (git, curl, zsh, base-devel)"
 
@@ -81,7 +66,6 @@ install_prerequisites() {
 		sudo pacman -S --needed --noconfirm "${missing[@]}"
 	fi
 
-	# 确保 yay 可用
 	if ! command -v yay &>/dev/null; then
 		warn "未检测到 yay，正在安装..."
 		install_yay
@@ -90,7 +74,6 @@ install_prerequisites() {
 	success "基础依赖已就绪"
 }
 
-# -------------------- 安装 yay (AUR Helper) --------------------
 install_yay() (
 	info "从源码编译安装 yay..."
 	local yay_dir
@@ -103,96 +86,87 @@ install_yay() (
 	success "yay 安装完成"
 )
 
-# -------------------- 安装核心工具包 --------------------
 install_packages() {
 	step "安装核心工具包"
 
-	# ---- 1. 核心终端增强 ----
 	local CORE_PACKAGES=(
-		chezmoi  # dotfiles 管理
-		neovim   # 编辑器
-		tmux     # 终端复用器
-		starship # Shell 提示符
-		fzf      # 模糊搜索
-		yazi     # 终端文件管理器
+		chezmoi
+		neovim
+		tmux
+		starship
+		fzf
+		yazi
 	)
 
-	# ---- 2. 现代 CLI 替代 (coreutils 增强) ----
 	local MODERN_CLI_PACKAGES=(
-		eza      # ls 替代 (图标/颜色)
-		zoxide   # cd 替代 (智能跳转)
-		bat      # cat 替代 (语法高亮)
-		ripgrep  # grep 替代 (极速搜索)
-		fd       # find 替代
-		sd       # sed 替代
-		dust     # du 替代 (磁盘用量可视化)
-		duf      # df 替代 (磁盘空间)
-		procs    # ps 替代
-		gping    # ping 替代 (图形化)
-		tealdeer # tldr (命令速查)
+		eza
+		zoxide
+		bat
+		ripgrep
+		fd
+		sd
+		dust
+		duf
+		procs
+		gping
+		tealdeer
 	)
 
-	# ---- 3. 系统监控 & 网络 ----
 	local MONITOR_PACKAGES=(
-		btop      # 系统资源监控 (TUI)
-		htop      # 进程监控
-		bottom    # 系统监控 (Rust)
-		fastfetch # 系统信息展示
-		gdu       # 磁盘空间分析 (Go)
-		ncdu      # 磁盘空间分析 (ncurses)
-		bandwhich # 网络带宽监控
-		trippy    # 网络路由诊断
-		mtr       # 网络诊断 (ping + traceroute)
-		progress  # coreutils 命令进度监控
+		btop
+		htop
+		bottom
+		fastfetch
+		gdu
+		ncdu
+		bandwhich
+		trippy
+		mtr
+		progress
 	)
 
-	# ---- 4. 开发工具 ----
 	local DEV_PACKAGES=(
-		llvm          # LLVM 基础工具链
-		clang         # C/C++ 编译器
-		mise          # 多语言版本管理 (Node/Lua/Python/Java/Go + CLI)
-		gdb            # 调试器 (配置由 dotfiles 管理)
-		shellcheck     # Shell 静态分析 (scripts/check.sh 依赖)
-		github-cli    # GitHub CLI (Arch 包名)
-		lazygit       # Git TUI (LazyVim 集成)
-		serpl         # 项目级搜索替换 TUI (tmux 快捷键依赖)
-		jq            # JSON 处理
-		yq            # YAML/XML/TOML 处理
-		dasel         # 多格式数据查询/修改 (JSON/YAML/TOML/CSV/XML)
-		xmlstarlet    # XML 处理工具
-		diff-so-fancy # Git diff 美化
-		git-delta     # Git diff 语法高亮分页器
-		sqlite        # SQLite 库 (Neovim yanky.nvim sqlite.lua 依赖)
-		uv            # Python 包/虚拟环境管理
-		dive          # Docker 镜像分析工具
-		trivy         # Docker 镜像漏洞扫描
+		llvm
+		clang
+		mise
+		gdb
+		shellcheck
+		github-cli
+		lazygit
+		serpl
+		jq
+		yq
+		dasel
+		xmlstarlet
+		diff-so-fancy
+		git-delta
+		sqlite
+		uv
+		dive
+		trivy
 	)
 
-	# ---- 5. 数据库客户端 ----
 	local DB_PACKAGES=(
-		postgresql-libs # psql 与 PostgreSQL 客户端工具
-		pgcli           # PostgreSQL 交互客户端
-		mycli           # MySQL 交互客户端
-		iredis          # Redis 交互客户端
-		pspg            # 表格 pager
+		postgresql-libs
+		pgcli
+		mycli
+		iredis
+		pspg
 	)
 
-	# ---- 6. 文件预览依赖 (Yazi) ----
 	local PREVIEW_PACKAGES=(
-		ffmpeg      # 视频预览/处理
-		imagemagick # 图片预览/处理
-		poppler     # PDF 预览
-		glow        # Markdown 渲染 (Yazi glow 插件依赖)
+		ffmpeg
+		imagemagick
+		poppler
+		glow
 	)
 
-	# ---- 7. 实用工具 ----
 	local UTIL_PACKAGES=(
-		dos2unix # 行尾转换 (WSL 常用)
-		pandoc-cli # 文档格式转换
-		pv       # 管道进度查看器
+		dos2unix
+		pandoc-cli
+		pv
 	)
 
-	# 合并所有分类
 	local ALL_PACKAGES=(
 		"${CORE_PACKAGES[@]}"
 		"${MODERN_CLI_PACKAGES[@]}"
@@ -201,7 +175,7 @@ install_packages() {
 		"${DB_PACKAGES[@]}"
 		"${PREVIEW_PACKAGES[@]}"
 		"${UTIL_PACKAGES[@]}"
-		7zip # Arch 包名
+		7zip
 	)
 
 	local to_install=()
@@ -233,7 +207,6 @@ install_packages() {
 	success "核心工具包安装完成"
 }
 
-# -------------------- 初始化 Hyprland local.lua --------------------
 setup_hyprland_local_lua() {
 	step "初始化 Hyprland local 配置占位文件"
 
@@ -244,7 +217,6 @@ setup_hyprland_local_lua() {
 	success "Hyprland local.lua 已就绪"
 }
 
-# -------------------- 准备运行时目录 --------------------
 setup_runtime_dirs() {
 	step "准备运行时目录"
 
@@ -254,7 +226,6 @@ setup_runtime_dirs() {
 	success "运行时目录已就绪"
 }
 
-# -------------------- 初始化 mise 运行时 --------------------
 setup_mise() {
 	step "初始化 mise 运行时和 CLI 工具"
 
@@ -283,7 +254,6 @@ setup_mise() {
 	success "mise 工具环境初始化完成"
 }
 
-# -------------------- 安装 Rustup --------------------
 install_rustup() {
 	step "安装 Rustup (Rust 官方工具链)"
 
@@ -299,7 +269,6 @@ install_rustup() {
 		success "Rustup 安装完成"
 	fi
 
-	# 动态加载环境变量以便当前脚本后续命令可用
 	if [ -f "$CARGO_ENV" ]; then
 		# shellcheck source=/dev/null
 		source "$CARGO_ENV"
@@ -311,12 +280,10 @@ install_rustup() {
 	fi
 }
 
-# -------------------- 配置 Neovim 运行环境 --------------------
 setup_neovim_providers() {
 	step "配置 Neovim 运行环境 (Python)"
 
-	# Python 虚拟环境 (通过 uv)
-	# 你的 ~/.config/nvim/lua/config/options.lua 已经指定了 python3_host_prog 路径
+	# options.lua 固定使用该虚拟环境作为 Python provider。
 	local NVIM_VENV="$HOME/.virtualenvs/nvim-python"
 
 	if ! command -v uv &>/dev/null; then
@@ -329,12 +296,10 @@ setup_neovim_providers() {
 		uv venv "$NVIM_VENV" -q
 	fi
 	info "安装 pynvim 到虚拟环境..."
-	# 使用 uv pip install 确保安装在指定的 venv 内
 	uv pip install -p "$NVIM_VENV" pynvim -q
 	success "Python 虚拟环境配置完成"
 }
 
-# -------------------- 安装 Oh My Zsh --------------------
 install_oh_my_zsh() {
 	step "检查 Oh My Zsh"
 
@@ -347,22 +312,18 @@ install_oh_my_zsh() {
 		return 1
 	else
 		info "正在安装 Oh My Zsh..."
-		# --unattended: 隐含 RUNZSH=no 和 CHSH=no (不切换 shell、不启动 zsh)
-		# --keep-zshrc: 不覆盖已有的 .zshrc
+		# 不启动 Zsh、不切换默认 shell，也不覆盖现有 .zshrc。
 		sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" \
 			--unattended --keep-zshrc
 		success "Oh My Zsh 安装完成"
 	fi
 
-	# 安装 Zsh 第三方插件
 	install_zsh_plugins
 }
 
-# -------------------- 安装 Zsh 第三方插件 --------------------
 install_zsh_plugins() {
 	step "安装 Zsh 第三方插件"
 
-	# Arch 通过包管理器安装
 	local ZSH_PKGS=(
 		zsh-completions
 		zsh-autosuggestions
@@ -400,7 +361,6 @@ install_zsh_plugins() {
 	success "Zsh 插件安装完成"
 }
 
-# -------------------- 安装 Tmux Plugin Manager (TPM) --------------------
 install_tpm() {
 	step "检查 Tmux Plugin Manager (TPM)"
 
@@ -420,7 +380,6 @@ install_tpm() {
 	fi
 }
 
-# -------------------- 使用 chezmoi 应用 dotfiles --------------------
 apply_dotfiles() {
 	step "使用 chezmoi 应用 dotfiles"
 
@@ -486,7 +445,6 @@ apply_dotfiles() {
 	fi
 }
 
-# -------------------- 安装 Yazi 插件 --------------------
 install_yazi_plugins() {
 	step "安装 Yazi 插件"
 
@@ -501,11 +459,9 @@ install_yazi_plugins() {
 	success "Yazi 插件安装完成"
 }
 
-# -------------------- 配置 Kanata 键盘映射 --------------------
 setup_kanata() {
 	step "配置 Kanata 键盘映射工具"
 
-	# 1. 安装 kanata-bin
 	if ! pacman -Qi kanata-bin &>/dev/null; then
 		info "使用 yay 安装 kanata-bin..."
 		yay -S --needed --noconfirm kanata-bin
@@ -517,16 +473,14 @@ setup_kanata() {
 	# 先解析配置，再申请输入设备权限。
 	/usr/bin/kanata --check --cfg "$HOME/.config/kanata/kanata.kbd"
 
-	# 2. 配置 uinput 权限 (kanata 需要访问 input 和 uinput 子系统)
+	# Kanata 需要 input 读权限和 uinput 写权限。
 	info "配置 uinput 权限..."
 
-	# 创建 uinput 组 (如果不存在)
 	if ! getent group uinput &>/dev/null; then
 		info "创建 uinput 系统组..."
 		sudo groupadd --system uinput
 	fi
 
-	# 将当前用户添加到 input 和 uinput 组
 	if ! id -nG "$USER" | grep -qw input; then
 		info "将 $USER 添加到 input 组..."
 		sudo usermod -aG input "$USER"
@@ -536,7 +490,6 @@ setup_kanata() {
 		sudo usermod -aG uinput "$USER"
 	fi
 
-	# 创建 udev 规则
 	local UDEV_RULE='/etc/udev/rules.d/99-dotfiles-kanata.rules'
 	local UDEV_CONTENT='KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"'
 	if [ ! -f "$UDEV_RULE" ] || ! grep -Fxq "$UDEV_CONTENT" "$UDEV_RULE"; then
@@ -548,26 +501,23 @@ setup_kanata() {
 		info "udev 规则已存在"
 	fi
 
-	# 确保 uinput 内核模块已加载
 	if [ ! -e /dev/uinput ]; then
 		info "加载 uinput 内核模块..."
 		sudo modprobe uinput
 	fi
 
-	# 确保 uinput 模块开机自动加载
 	local MODULES_LOAD='/etc/modules-load.d/dotfiles-kanata.conf'
 	if [ ! -f "$MODULES_LOAD" ] || ! grep -Fxq uinput "$MODULES_LOAD"; then
 		info "配置 uinput 模块开机自动加载..."
 		echo 'uinput' | sudo tee "$MODULES_LOAD" >/dev/null
 	fi
 
-	# 3. 启用 systemd 用户服务 (服务文件由 chezmoi 管理)
 	local SERVICE_FILE="$HOME/.config/systemd/user/kanata.service"
 	if [ -f "$SERVICE_FILE" ]; then
 		info "启用 Kanata systemd 用户服务..."
 		systemctl --user daemon-reload
 		systemctl --user enable kanata.service
-		# 尝试启动服务 (如果组权限尚未生效可能会失败，重新登录后生效)
+		# 新增组权限可能要重新登录后才生效。
 		systemctl --user start kanata.service 2>/dev/null ||
 			warn "Kanata 服务启动失败 (可能需要重新登录以生效用户组权限)"
 		success "Kanata systemd 服务已启用 (开机自启)"
@@ -579,7 +529,6 @@ setup_kanata() {
 	success "Kanata 键盘映射配置完成"
 }
 
-# -------------------- 设置默认 Shell 为 Zsh --------------------
 set_default_shell() {
 	step "检查默认 Shell"
 
@@ -593,7 +542,6 @@ set_default_shell() {
 		return 0
 	fi
 
-	# 确保 zsh 在 /etc/shells 中
 	if ! grep -q "$zsh_path" /etc/shells 2>/dev/null; then
 		info "将 $zsh_path 添加到 /etc/shells ..."
 		echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
@@ -611,7 +559,6 @@ set_default_shell() {
 	fi
 }
 
-# -------------------- 安装 Tmux 插件 --------------------
 install_tmux_plugins() {
 	step "安装 Tmux 插件"
 
@@ -628,7 +575,6 @@ install_tmux_plugins() {
 	success "Tmux 插件安装完成"
 }
 
-# -------------------- 最终验证 --------------------
 post_install_check() {
 	step "安装验证"
 
@@ -650,7 +596,7 @@ post_install_check() {
 
 	if $INSTALL_KANATA; then tools+=(kanata); fi
 
-	# 有多个可能命令名的工具 (主命令|备选命令)
+	# 验证可能因发行版版本不同而改名的命令。
 	local tools_with_alt=(
 		"magick|convert" # ImageMagick v7 vs v6
 		"7zz|7z"         # 7zip vs p7zip
@@ -701,7 +647,6 @@ post_install_check() {
 	fi
 }
 
-# -------------------- 打印安装摘要 --------------------
 print_summary() {
 	echo ""
 	echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
@@ -727,7 +672,6 @@ print_summary() {
 	echo ""
 }
 
-# ==================== 主流程 ====================
 main() {
 	INSTALL_KANATA=false
 	case "${1:-}" in
@@ -747,7 +691,7 @@ main() {
 	install_prerequisites
 	install_packages
 	setup_runtime_dirs
-	# 将 apply_dotfiles 提前，确保后续步骤能读取到配置 (如 config.toml, package.toml 等)
+	# 后续步骤依赖已部署的 mise/Yazi 配置。
 	apply_dotfiles
 	setup_hyprland_local_lua
 	setup_mise
